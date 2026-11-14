@@ -3,8 +3,8 @@ using Kiln;
 
 namespace MoreFlameAltars;
 
-/// <summary>Settings, in the mod's config file. Read once, before the game starts: restart the game or the server after an
-/// edit.</summary>
+/// <summary>Settings, in the mod's config file. The game's table is changed once, before the game starts, so a change
+/// applies at the next start; with beyondSixteen on (the hook), a change to the Flame Altar settings applies at once.</summary>
 public sealed class Settings
 {
     [Comment("Flame Altars a world may have at every Flame level: at least this many. The game's own numbers grow with the " +
@@ -71,7 +71,7 @@ public sealed partial class MoreFlameAltarsMod : Mod
         if (Ui.Available) OpenWindow();
         if (Cfg().Value.BeyondSixteen)
         {
-            if (AltarLimitHook.Install(AltarHardCap, out var why))
+            if (AltarLimitHook.Install(HookRules(), out var why))
                 Log.Info($"More Flame Altars: altars above 16 are on (up to {AltarHardCap}, experimental): altars 17 and up are build-only");
             else
                 Log.Warn($"More Flame Altars: altars above 16 could not be switched on ({why}); the game's limit of 16 stays");
@@ -85,6 +85,31 @@ public sealed partial class MoreFlameAltarsMod : Mod
                      (state.Issues.Count > 0 ? $": {state.Issues[0].Reason}" : "") +
                      "). It changes the game's data before the game starts, so it needs a restart after it is switched on " +
                      "or after its settings change.");
+    }
+
+    /// <summary>The hook's rules: this start's table was made with the running settings (what OnBoot read); the answer
+    /// follows the settings as they are saved now.</summary>
+    private AltarLimitHook.Rules HookRules() =>
+        new(AltarRule.Of(Cfg().Value), AltarRule.Of(SettingIndex.From(Saved(Cfg()))));
+
+    /// <summary>After the settings changed (tick thread): with the hook in, or beyondSixteen just switched on, the altar
+    /// settings apply at once, here and in every joined Kiln client. Says what applies when.</summary>
+    private string ApplyNow()
+    {
+        var saved = SettingIndex.From(Saved(Cfg()));
+        var running = Cfg().Value;
+        var waterLater = saved.WaterSources != running.WaterSources || saved.ExtraWaterSources != running.ExtraWaterSources;
+        string? failed = null;
+        // a failure is in the text, which the window's request and /altars set log and answer
+        if (!AltarLimitHook.Installed && saved.BeyondSixteen && !AltarLimitHook.Install(HookRules(), out var why)) failed = why;
+        if (!AltarLimitHook.Installed)
+            return failed is null ? AppliesWhen() : $"Altars above 16 could not be switched on now ({failed}). {AppliesWhen()}";
+        AltarLimitHook.SetRules(HookRules());
+        var limits = LimitsMessage();
+        var sent = limits.ByLevel.Length > 0 ? _ch?.SendToAll(limits) ?? 0 : 0;
+        var altarsOnly = new Settings { Altars = saved.Altars, ExtraAltars = saved.ExtraAltars, BeyondSixteen = saved.BeyondSixteen };
+        Log.Info($"More Flame Altars: the Flame Altar limit now: {Describe(altarsOnly)}" + (sent > 0 ? $"; sent to {sent} player(s)" : ""));
+        return "The Flame Altar limit applies now." + (waterLater ? " Water sources: " + AppliesWhen() : "");
     }
 
     /// <summary>The boot patch for these settings, or null when they leave every number as the game has it.</summary>

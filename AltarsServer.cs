@@ -13,6 +13,7 @@ public sealed partial class MoreFlameAltarsMod
 
     private NetChannel? _ch;
     private ModConfig<Settings>? _cfg;
+    private bool _saving;  // the window or /altars set writes the settings: they apply once, after the last write
 
     /// <summary>Both sides: the channel (same order of messages on both), the permission node.</summary>
     private void OpenChannel()
@@ -26,7 +27,7 @@ public sealed partial class MoreFlameAltarsMod
         Network.Disconnected += _ =>
         {
             AltarLimitHook.SetServer(null);
-            AltarLimitHook.SetCap(CapOf(Cfg().Value));
+            AltarLimitHook.SetRules(HookRules());
             ResetWindow();
         };
     }
@@ -37,19 +38,45 @@ public sealed partial class MoreFlameAltarsMod
     private void OnPeerReady(NetPeerReadyEvent e)
     {
         if (!e.Peer.HasChannel(Channel)) return;
-        var cap = AltarLimitHook.Installed ? AltarHardCap : AltarCap;
-        var by = new List<byte>();
-        for (var level = 0; level < 64 && WorldProgress.LimitsAt(level) is { } l; level++) by.Add((byte)Math.Clamp(l.Altars, 1, cap));
-        if (by.Count > 0) _ch!.SendTo(e.Peer, new AltarsLimits(AltarLimitHook.Installed, by.ToArray()));
+        if (LimitsMessage() is { ByLevel.Length: > 0 } m) _ch!.SendTo(e.Peer, m);
     }
 
-    /// <summary>Client: the server's limits. Above 16 they need the hook here too, or this game's cursor refuses the 17th.</summary>
+    /// <summary>The limit at each Flame level as this server answers it now (tick thread): through the hook when it is in,
+    /// else the game's table, which the game itself caps at 16.</summary>
+    private static AltarsLimits LimitsMessage()
+    {
+        var hooked = AltarLimitHook.Installed;
+        var cap = hooked ? AltarLimitHook.Live.Cap : AltarCap;
+        var by = new List<byte>();
+        for (var level = 0; level < 64 && WorldProgress.LimitsAt(level) is { } l; level++)
+            by.Add((byte)Math.Clamp(hooked ? AltarLimitHook.Answer((uint)level, l.Altars) : l.Altars, 1, cap));
+        return new AltarsLimits(cap > AltarCap, by.ToArray());
+    }
+
+    /// <summary>Client: the server's limits. When they differ from this game's own (above 16, or changed while the server
+    /// runs), they need the hook here too, or this game's cursor refuses what the server allows.</summary>
     private void OnLimits(AltarsLimits m)
     {
+        if (Hosted) return;  // a world this game hosts: its own server part answers, in this same process
         AltarLimitHook.SetServer(m.ByLevel);
-        if (!m.Beyond || AltarLimitHook.Installed) return;
-        if (!AltarLimitHook.Install(AltarHardCap, out var why))
-            Log.Warn($"More Flame Altars: the server allows more than 16 altars, but this game cannot follow ({why}): it stops at 16");
+        if (AltarLimitHook.Installed || !DiffersFromOwn(m.ByLevel)) return;
+        if (!AltarLimitHook.Install(HookRules(), out var why))
+            Log.Warn($"More Flame Altars: the server allows other altar numbers than this game's own, but this game cannot follow ({why})");
+    }
+
+    private static bool DiffersFromOwn(byte[] server)
+    {
+        for (var level = 0; level < server.Length; level++)
+            if (WorldProgress.LimitsAt(level) is not { } l || Math.Min(l.Altars, AltarCap) != server[level]) return true;
+        return false;
+    }
+
+    /// <summary>A change made elsewhere (Kiln's settings menu, the file): applied like one made in the window.</summary>
+    [Subscribe]
+    private void OnConfigChanged(ConfigChangedEvent e)
+    {
+        if (_saving || e.ModId != Context.Info.Id) return;
+        Log.Info($"More Flame Altars: settings changed ({e.Source}): {ApplyNow()}");
     }
 
     [Command("altars", Description = "Opens the Flame Altars window: this world's Flame level, altars, water sources and the mod's settings")]
@@ -83,7 +110,12 @@ public sealed partial class MoreFlameAltarsMod
             c.Fail(validation);
             return "";
         }
-        if (!Cfg().TrySet(path, path == "beyondSixteen" ? value != 0 : value, out var error))
+        bool set;
+        string error;
+        _saving = true;
+        try { set = Cfg().TrySet(path, path == "beyondSixteen" ? value != 0 : value, out error); }
+        finally { _saving = false; }
+        if (!set)
         {
             c.Fail($"{path} not changed: {error}");
             return "";
@@ -93,7 +125,7 @@ public sealed partial class MoreFlameAltarsMod
             c.Fail(error);
             return "";
         }
-        return $"{path} = {value}, saved. {AppliesWhen()}";
+        return $"{path} = {value}, saved. {ApplyNow()}";
     }
 
     [Command("altars flame", Description = "Sets the world's Flame level (1 to its maximum)", Permission = CommandPermission.Admin, Node = ManageNode)]
@@ -135,6 +167,9 @@ public sealed partial class MoreFlameAltarsMod
         var cfg = Cfg();
         var running = SettingIndex.Of(cfg.Value);
         var saved = Saved(cfg);
+        var hooked = AltarLimitHook.Installed;
+        if (hooked)  // the altar settings apply at once through the hook: the saved ones are the running ones
+            foreach (var i in new[] { SettingIndex.Altars, SettingIndex.ExtraAltars, SettingIndex.BeyondSixteen }) running[i] = saved[i];
         var flame = WorldProgress.Available ? WorldProgress.Flame : null;
         var max = flame?.Max ?? 20;
         var altarsBy = new List<byte>();
@@ -142,7 +177,7 @@ public sealed partial class MoreFlameAltarsMod
         for (var level = 0; level <= max && level < 64; level++)
         {
             if (WorldProgress.LimitsAt(level) is not { } l) break;
-            altarsBy.Add((byte)Math.Clamp(l.Altars, 0, AltarLimitHook.Installed ? AltarHardCap : AltarCap));
+            altarsBy.Add((byte)(hooked ? AltarLimitHook.Answer((uint)level, l.Altars) : Math.Clamp(l.Altars, 0, AltarCap)));
             waterBy.Add((byte)Math.Clamp(l.WaterSources, 0, 255));
         }
         var allowed = flame is null ? null : WorldProgress.LimitsAt(flame.Level);
@@ -150,7 +185,7 @@ public sealed partial class MoreFlameAltarsMod
         if (!running.SequenceEqual(saved)) note = (note.Length > 0 ? note + " " : "") + "Saved settings differ from the running ones. " + AppliesWhen();
         return new AltarsState(open, Permissions.Has(player, ManageNode), Hosted, active, note,
             flame?.Level ?? -1, max, flame?.Altars ?? -1,
-            allowed is null ? -1 : Math.Min(allowed.Altars, AltarLimitHook.Installed ? AltarHardCap : AltarCap),
+            allowed is null ? -1 : hooked ? AltarLimitHook.Answer((uint)flame!.Level, allowed.Altars) : Math.Min(allowed.Altars, AltarCap),
             flame?.WaterSources ?? -1, allowed?.WaterSources ?? -1,
             running, saved, altarsBy.ToArray(), waterBy.ToArray());
     }
@@ -254,11 +289,16 @@ public sealed partial class MoreFlameAltarsMod
         var cfg = Cfg();
         var paths = SettingIndex.Paths;
         var errors = new List<string>();
-        for (var i = 0; i < paths.Length; i++)
-            if (!cfg.TrySet(paths[i], i == SettingIndex.BeyondSixteen ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
+        _saving = true;
+        try
+        {
+            for (var i = 0; i < paths.Length; i++)
+                if (!cfg.TrySet(paths[i], i == SettingIndex.BeyondSixteen ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
+        }
+        finally { _saving = false; }
         if (errors.Count > 0) return (false, "Some settings could not be saved: " + string.Join("; ", errors));
         return SavedOnDisk(cfg, out var errorText)
-            ? (true, $"Saved: {Describe(SettingIndex.From(values))}. {AppliesWhen()}")
+            ? (true, $"Saved: {Describe(SettingIndex.From(values))}. {ApplyNow()}")
             : (false, errorText);
     }
 

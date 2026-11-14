@@ -105,4 +105,25 @@ finally
     directory.SetValue(null, previous);
     Directory.Delete(root, recursive: true);
 }
+// The hook's answer (AltarLimitHook.Answer): the live rule on the game's number, whatever this start's table holds.
+{
+    var asm = modType.Assembly;
+    var ruleType = asm.GetType("MoreFlameAltars.AltarRule")!;
+    var hookType = asm.GetType("MoreFlameAltars.AltarLimitHook")!;
+    var rulesType = hookType.GetNestedType("Rules", BindingFlags.NonPublic)!;
+    object Rule(int atLeast, int extra, int cap) => Activator.CreateInstance(ruleType, atLeast, extra, cap)!;
+    object Rules(object boot, object live) => Activator.CreateInstance(rulesType, boot, live)!;
+    var answer = hookType.GetMethod("Answer", statics, [rulesType, typeof(uint), typeof(int)])!;
+    int Answer(object rules, uint level, int table) => (int)answer.Invoke(null, [rules, level, table])!;
+    var start16 = Rule(16, 0, 16);   // a start with the defaults: the table holds 16 at every level
+    Check(Answer(Rules(start16, Rule(32, 0, 32)), 1, 16) == 32, "beyondSixteen switched on in a running start answers 32 at once");
+    Check(Answer(Rules(start16, Rule(20, 0, 32)), 12, 16) == 20, "a raised number applies to every level at once");
+    Check(Answer(Rules(start16, Rule(1, 0, 16)), 1, 16) == 2, "lowering again answers the game's own number (2 at level 1)");
+    Check(Answer(Rules(start16, Rule(1, 2, 32)), 1, 16) == 4, "extraAltars applies to the game's number, not to the raised table");
+    Check(Answer(Rules(start16, Rule(32, 0, 32)), 1, 2) == 32, "a start whose boot patch did not run (the game's 2) still answers the rule");
+    Check(Answer(Rules(start16, Rule(1, 0, 16)), 1, 5) == 5, "a table that matches neither rule (a game update) is never answered below");
+    Check(Answer(Rules(start16, Rule(32, 0, 32)), 40, 16) == 32, "levels past the list use the last level");
+    Check(Answer(Rules(Rule(32, 0, 32), Rule(32, 0, 16)), 3, 32) == 16, "beyondSixteen switched off again caps at 16 at once");
+}
+
 Console.WriteLine($"{checks} offline regression checks passed.");

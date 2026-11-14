@@ -49,8 +49,11 @@ off on game clients until they have passed their test in a real game (`mods.boot
 
 ## Settings
 
-`kiln/config/more-flame-altars.json` (or the mod's settings in Kiln's in-game menu). Read once, when the game or the
-server starts: restart after a change.
+`kiln/config/more-flame-altars.json` (or the mod's settings in Kiln's in-game menu). The game's table is changed once,
+when the game or the server starts, so a change applies at the next start. With `beyondSixteen` on, a change to the
+Flame Altar settings (`altars`, `extraAltars`, `beyondSixteen`) applies at once instead, also when you switch
+`beyondSixteen` on: the mod's hook then answers the game's altar limit from the settings as they are saved. Water
+sources always wait for the next start.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -72,7 +75,8 @@ list) has room for exactly 16. With `beyondSixteen` on, the mod lifts the first 
   animals, no journal entry;
 - which altars those are follows the order the game lists them in, which can change after a reload: a base that worked
   yesterday can lose those features and another gains them;
-- every player needs the mod (a Kiln client follows the server's limit when it joins; a game without the mod stops at 16);
+- every player needs the mod (a Kiln client follows the server's limit when it joins and when it changes; a game
+  without the mod stops at 16);
 - it is off by default and only for admins to switch on.
 
 This is what other tools' "unlimited altars" switches do as well (one of them answers 255 at every Flame level and is
@@ -85,8 +89,9 @@ one base ("extension altars"), which would allow more altars without more than 1
 
 Type `/altars` in the chat. With the mod in your game, a window opens: the world's Flame level, the altars and water
 sources placed and allowed, the numbers at every Flame level, and the mod's settings. Admins (permission
-`more-flame-altars.manage`) can change the settings there (they apply at the next start of the server, or of your game
-when you host) and set the world's Flame level. The window also has the `beyondSixteen` switch, with its warning. Everyone else sees the same window, read only.
+`more-flame-altars.manage`) can change the settings there (see [Settings](#settings) for when they apply: the altars
+at once with `beyondSixteen` on, otherwise at the next start of the server, or of your game when you host) and set the
+world's Flame level. The window also has the `beyondSixteen` switch, with its warning. Everyone else sees the same window, read only.
 
 Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen> <value>`
 (use 0 or 1 for `beyondSixteen`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
@@ -109,7 +114,12 @@ On a lab server (Kiln 0.2.0-dev.28, server build 26430253, no player), by the la
   `WorldProgress.LimitsAt` reports them;
 - settings that change nothing stage nothing.
 - with `beyondSixteen` on, the game's own altar-limit function (called with a made-up table) answers up to 32 through
-  the mod's hook, and 16 with it off.
+  the mod's hook, and 16 with it off;
+- switching `beyondSixteen` on and `altars` to 24 from the server console while the server runs puts the hook in at
+  once, and the function then answers the new numbers, with no restart.
+
+The client exe (build 26430625) has one copy of that function; its 11 callers are the build cursor, the hosted world's
+placement checks and the numbers in the game's UI, so the hook covers a world you host too (a static read, not a test).
 
 Not checked yet, because it needs a player:
 

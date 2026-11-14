@@ -14,6 +14,9 @@ public sealed partial class MoreFlameAltarsMod
     private static readonly int[] GameAltars = [1, 2, 4, 6, 8, 10, 11, 12, 13, 14, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16];
     private static readonly int[] GameWater = [1, 1, 1, 1, 5, 10, 20, 30, 40, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50];
 
+    /// <summary>The game's own number of Flame Altars at <paramref name="level"/> (the last one above the list).</summary>
+    internal static int GameAltarsAt(uint level) => GameAltars[(int)Math.Min(level, (uint)GameAltars.Length - 1)];
+
     private UiWindow? _window;
     private volatile AltarsState? _state;
     private int[]? _edit;                      // the settings being edited (render thread)
@@ -137,7 +140,10 @@ public sealed partial class MoreFlameAltarsMod
         }
         if (!s.Active) ui.Text(Color.Orange, "The mod's numbers are not active in this start.");
         if (s.Note.Length > 0) ui.TextWrapped(s.Note);
-        if (_booted is { } mine && !mine.SequenceEqual(s.Running) && !Client.IsHosting)
+        // with the hook in, this game follows the server's altar numbers: only the water sources can differ then
+        if (_booted is { } mine && !Client.IsHosting && (AltarLimitHook.Installed
+                ? mine[SettingIndex.WaterSources] != s.Running[SettingIndex.WaterSources] || mine[SettingIndex.ExtraWaterSources] != s.Running[SettingIndex.ExtraWaterSources]
+                : !mine.SequenceEqual(s.Running)))
             ui.TextWrapped("Your game started with other settings than the server's (yours: " + Describe(SettingIndex.From(mine)) +
                            "). Your game may then show or allow other numbers than the server. Set the same settings in your game " +
                            "(Kiln menu > Mods > More Flame Altars > Config) and restart it.");
@@ -178,7 +184,8 @@ public sealed partial class MoreFlameAltarsMod
             if (ui.Button("Undo")) _edit = (int[])s.Saved.Clone();
             ui.SameLine();
             if (ui.Button("Defaults")) _edit = SettingIndex.Of(new Settings());
-            ui.TextDisabled(s.Hosted ? "Saved settings apply when the host starts the game again." : "Saved settings apply when the server starts again.");
+            ui.TextDisabled("With more than 16 altars allowed, a change to the altars applies at once. Water sources, and altars " +
+                            (s.Hosted ? "without it, apply when the host starts the game again." : "without it, apply when the server starts again."));
         }
         else
         {

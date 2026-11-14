@@ -73,8 +73,34 @@ public sealed class Tests
         }
     }
 
+    /// <summary>What the limit function answers at <paramref name="level"/> for table value <paramref name="table"/>: the
+    /// game's min(value, 16) without beyondSixteen; with it the mod's detour (AltarLimitHook.Answer): the settings' rule on
+    /// the game's number when the table holds the game's number or the rule's, else on the table's value, at most 32.</summary>
+    private static uint Expected(uint level, byte table)
+    {
+        // the hook is in when the start had beyondSixteen, or once it is switched on while the server runs; the table was
+        // made with the running settings, the answer follows the saved ones (a change made while the server runs)
+        var (running, saved) = (S, Saved());
+        if (!running.Beyond && !saved.Beyond) return Math.Min(table, 16u);
+        var game = GameAltars[(int)Math.Min(level, (uint)GameAltars.Length - 1)];
+        int Rule(int g, int atLeast, int extra, bool beyond) =>
+            Math.Max(g, Math.Clamp(Math.Max(g + Math.Max(0, extra), atLeast), 0, beyond ? 32 : 16));
+        var from = table == game || Rule(game, running.Altars, running.ExtraAltars, running.Beyond) == table ? game : table;
+        return (uint)Math.Clamp(Rule(from, saved.Altars, saved.ExtraAltars, saved.Beyond), 1, saved.Beyond ? 32 : 16);
+    }
+
+    /// <summary>The altar settings as the file holds them (a change waiting for a restart included).</summary>
+    private static (int Altars, int ExtraAltars, bool Beyond) Saved()
+    {
+        var cfg = Assert.NotNull(Config.Find(ModId), "More Flame Altars registered its config");
+        // the file value comes as the file's JSON value: read it through its text, as the mod does
+        string File(string path) => Convert.ToString(cfg.Entries.FirstOrDefault(e => e.Path == path)?.FileValue ?? cfg.Get(path),
+            System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        return (int.Parse(File("altars")), int.Parse(File("extraAltars")), bool.Parse(File("beyondSixteen")));
+    }
+
     /// <summary>The game's own altar-limit function, called with a made-up balancing table: with beyondSixteen it answers
-    /// up to 32 (the mod's detour), without it the game's min(value, 16). Proves the detour on the real function; whether
+    /// the mod's detour (up to 32), without it the game's min(value, 16). Proves the detour on the real function; whether
     /// the game then lets a player place the altar needs a player.</summary>
     [KilnTest]
     public unsafe void The_games_limit_function_answers_the_mods_cap()
@@ -93,9 +119,8 @@ public sealed class Tests
             byte[] values = [3, 20, 40, 16];
             for (var i = 0; i < values.Length; i++) blob[0x10 + i] = values[i];
             var limit = (delegate* unmanaged<nint, uint, uint>)fn;
-            var cap = S.Beyond ? 32u : 16u;
             for (uint level = 0; level < values.Length; level++)
-                Assert.Equal(Math.Min(values[level], cap), limit((nint)registry, level), $"limit at level {level} (table {values[level]}, cap {cap})");
+                Assert.Equal(Expected(level, values[level]), limit((nint)registry, level), $"limit at level {level} (table {values[level]}, running {S}, saved {Saved()})");
         }
         finally
         {
