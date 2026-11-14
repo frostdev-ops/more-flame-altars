@@ -156,6 +156,10 @@ def make_social():
     lettering(image, SOCIAL_LINE, (67, 444), ImageFont.truetype(REGULAR, 30),
               SECONDARY_COLOR, shadow_offset=(0, 2))
     save(image, "github_social_1280x640.png", [TITLE, SOCIAL_LINE])
+    # GitHub's social preview takes at most 1 MB; the PNG is larger.
+    jpg = OUT / "github_social_1280x640.jpg"
+    image.convert("RGB").save(jpg, quality=92, optimize=True, progressive=True, subsampling=0)
+    assert jpg.stat().st_size < 1_000_000, (jpg.name, jpg.stat().st_size)
 
 
 def make_discord():
