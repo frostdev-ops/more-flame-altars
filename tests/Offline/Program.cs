@@ -93,6 +93,14 @@ try
     var pending = cfg.Entries.ToDictionary(e => e.Path, e => e.FileValue);
     Check(Convert.ToInt32(pending["altars"]) == 12 && Convert.ToBoolean(pending["beyondSixteen"]), "saved values pending restart");
 
+    // Restoring a RequiresRestart entry through TrySet emits no event in dev.28.
+    modType.GetField("ServerSide", statics)!.SetValue(null, (Func<bool>)(() => true));
+    modType.GetField("_observedSettings", instance)!.SetValue(mod, new int[] { 12, 2, 10, 5, 1 });
+    Check(cfg.TrySet("altars", 16, out _), "restore running altar setting");
+    Call(mod, "CheckSettings", default(TickInfo));
+    Check(((int[])modType.GetField("_observedSettings", instance)!.GetValue(mod)!)[0] == 16,
+        "tick fallback observes restoring a restart setting without a config event");
+
     // A directory at the destination makes the SDK's atomic rename fail, even when running as root.
     var blocked = Path.Combine(root, "blocked.json");
     Directory.CreateDirectory(blocked);
@@ -122,6 +130,8 @@ finally
     Check(Answer(Rules(start16, Rule(1, 2, 32)), 1, 16) == 4, "extraAltars applies to the game's number, not to the raised table");
     Check(Answer(Rules(start16, Rule(32, 0, 32)), 1, 2) == 32, "a start whose boot patch did not run (the game's 2) still answers the rule");
     Check(Answer(Rules(start16, Rule(1, 0, 16)), 1, 5) == 5, "a table that matches neither rule (a game update) is never answered below");
+    Check(Answer(Rules(start16, Rule(1, 0, 16)), 1, 20) == 16, "an unknown table value above 16 is answered as the game would: 16");
+    Check(Answer(Rules(start16, Rule(32, 0, 32)), 1, 40) == 32, "an unknown table value never takes the answer past the cap of 32");
     Check(Answer(Rules(start16, Rule(32, 0, 32)), 40, 16) == 32, "levels past the list use the last level");
     Check(Answer(Rules(Rule(32, 0, 32), Rule(32, 0, 16)), 3, 32) == 16, "beyondSixteen switched off again caps at 16 at once");
 }

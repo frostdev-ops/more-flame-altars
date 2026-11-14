@@ -184,8 +184,9 @@ public sealed partial class MoreFlameAltarsMod
             if (ui.Button("Undo")) _edit = (int[])s.Saved.Clone();
             ui.SameLine();
             if (ui.Button("Defaults")) _edit = SettingIndex.Of(new Settings());
-            ui.TextDisabled("With more than 16 altars allowed, a change to the altars applies at once. Water sources, and altars " +
-                            (s.Hosted ? "without it, apply when the host starts the game again." : "without it, apply when the server starts again."));
+            ui.TextDisabled("Once more than 16 altars is switched on, altar changes apply at once for the rest of this start, also after " +
+                            "switching it off again. Water sources, and altar changes made before that, apply when " +
+                            (s.Hosted ? "the host starts the game again." : "the server starts again."));
         }
         else
         {

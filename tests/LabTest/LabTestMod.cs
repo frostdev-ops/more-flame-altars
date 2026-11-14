@@ -81,12 +81,16 @@ public sealed class Tests
         // the hook is in when the start had beyondSixteen, or once it is switched on while the server runs; the table was
         // made with the running settings, the answer follows the saved ones (a change made while the server runs)
         var (running, saved) = (S, Saved());
-        if (!running.Beyond && !saved.Beyond) return Math.Min(table, 16u);
+        var hookType = AppDomain.CurrentDomain.GetAssemblies()
+            .Select(a => a.GetType("MoreFlameAltars.AltarLimitHook")).First(t => t is not null)!;
+        var installed = (bool)hookType.GetProperty("Installed")!.GetValue(null)!;
+        if (running.Beyond || saved.Beyond) Assert.True(installed, "beyondSixteen requires the detour to be installed");
+        if (!installed) return Math.Min(table, 16u);
         var game = GameAltars[(int)Math.Min(level, (uint)GameAltars.Length - 1)];
         int Rule(int g, int atLeast, int extra, bool beyond) =>
             Math.Max(g, Math.Clamp(Math.Max(g + Math.Max(0, extra), atLeast), 0, beyond ? 32 : 16));
-        var from = table == game || Rule(game, running.Altars, running.ExtraAltars, running.Beyond) == table ? game : table;
-        return (uint)Math.Clamp(Rule(from, saved.Altars, saved.ExtraAltars, saved.Beyond), 1, saved.Beyond ? 32 : 16);
+        var from = table == game || Rule(game, running.Altars, running.ExtraAltars, running.Beyond) == table ? game : Math.Min((int)table, 16);
+        return (uint)Math.Max(1, Rule(from, saved.Altars, saved.ExtraAltars, saved.Beyond));
     }
 
     /// <summary>The altar settings as the file holds them (a change waiting for a restart included).</summary>

@@ -68,6 +68,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
     public override void OnLoad()
     {
         OpenChannel();
+        _observedSettings = Saved(Cfg());
+        Context.Tick.Pre += CheckSettings;
         if (Ui.Available) OpenWindow();
         if (Cfg().Value.BeyondSixteen)
         {
@@ -94,9 +96,29 @@ public sealed partial class MoreFlameAltarsMod : Mod
 
     /// <summary>After the settings changed (tick thread): with the hook in, or beyondSixteen just switched on, the altar
     /// settings apply at once, here and in every joined Kiln client. Says what applies when.</summary>
+    private int[]? _observedSettings;
+    private long _nextSettingsCheck;
+
+    // Kiln emits no event when TrySet restores a restart entry to its running value: look at the saved settings once a
+    // second (a server, or a game that hosts; a joined game follows its server).
+    private void CheckSettings(in TickInfo tick)
+    {
+        var now = Environment.TickCount64;
+        if (_saving || now < _nextSettingsCheck || !IsServerSide) return;
+        _nextSettingsCheck = now + 1000;
+        if (_observedSettings is { } old && old.SequenceEqual(Saved(Cfg()))) return;
+        ApplyNow();
+    }
+
+    /// <summary>A dedicated server, or a game that hosts its world: the side whose settings decide the limits.</summary>
+    private static bool IsServerSide => ServerSide();
+    private static Func<bool> ServerSide = () => Client.IsDedicatedServer || Client.IsHosting;  // the offline checks set it
+
     private string ApplyNow()
     {
-        var saved = SettingIndex.From(Saved(Cfg()));
+        _observedSettings = Saved(Cfg());
+        if (!IsServerSide) return "A game that joins a server follows the server's numbers.";
+        var saved = SettingIndex.From(_observedSettings);
         var running = Cfg().Value;
         var waterLater = saved.WaterSources != running.WaterSources || saved.ExtraWaterSources != running.ExtraWaterSources;
         string? failed = null;

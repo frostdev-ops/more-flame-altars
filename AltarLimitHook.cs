@@ -91,12 +91,13 @@ internal static class AltarLimitHook
     /// <summary>The limit at <paramref name="level"/> when this start's table holds <paramref name="table"/> there. The
     /// table is the game's number with the boot rule applied, or the game's own number when the boot patch did not run;
     /// either way the live rule is applied to the game's number. A table that matches neither (a game update changed the
-    /// game's numbers) is taken as the base instead, so the answer never drops below what the game itself allows.</summary>
+    /// game's numbers, or another mod the table) is taken as the game would answer it, min(table, 16): the answer never
+    /// drops below what the game itself allows, and never goes past the live rule's cap.</summary>
     internal static int Answer(Rules rules, uint level, int table)
     {
         var game = MoreFlameAltarsMod.GameAltarsAt(level);
-        var from = table == game || rules.Boot.Apply(game) == table ? game : table;
-        return Math.Clamp(rules.Live.Apply(from), 1, rules.Live.Cap);
+        var from = table == game || rules.Boot.Apply(game) == table ? game : Math.Min(table, MoreFlameAltarsMod.AltarCap);
+        return Math.Max(1, rules.Live.Apply(from));
     }
 
     /// <summary>What the hook answers now at <paramref name="level"/> for a table value read on the tick thread.</summary>

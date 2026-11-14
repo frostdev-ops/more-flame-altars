@@ -296,9 +296,10 @@ public sealed partial class MoreFlameAltarsMod
                 if (!cfg.TrySet(paths[i], i == SettingIndex.BeyondSixteen ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
         }
         finally { _saving = false; }
-        if (errors.Count > 0) return (false, "Some settings could not be saved: " + string.Join("; ", errors));
+        var applied = ApplyNow(); // earlier entries may have succeeded even if a later write failed
+        if (errors.Count > 0) return (false, "Some settings could not be saved: " + string.Join("; ", errors) + ". " + applied);
         return SavedOnDisk(cfg, out var errorText)
-            ? (true, $"Saved: {Describe(SettingIndex.From(values))}. {ApplyNow()}")
+            ? (true, $"Saved: {Describe(SettingIndex.From(values))}. {applied}")
             : (false, errorText);
     }
 
