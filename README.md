@@ -4,9 +4,9 @@
 
 More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources too.
 
-> **Which version?** This README describes 0.2.0, which needs Kiln 0.2.0-dev.28. Kiln 0.2.0-dev.28 is not out yet.
-> Until it is, use **0.1.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases): 16 Flame
-> Altars at every Flame level, for Kiln 0.2.0-dev.27 (see [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
+> **Which version?** This README describes 0.2.0, which needs Kiln 0.2.0-dev.28 or later. Still on Kiln 0.2.0-dev.27?
+> Use **0.1.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases): 16 Flame Altars at every
+> Flame level (see [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
 
 The game ties the number of Flame Altars to the world's Flame level: a new world allows 2, and the game only reaches 16
 at Flame level 11. By default this mod allows 16 at every level, so you can found all your bases from the start. Or keep
@@ -121,10 +121,14 @@ On a lab server (Kiln 0.2.0-dev.28, server build 26430253, no player), by the la
 The client exe (build 26430625) has one copy of that function; its 11 callers are the build cursor, the hosted world's
 placement checks and the numbers in the game's UI, so the hook covers a world you host too (a static read, not a test).
 
-Not checked yet, because it needs a player:
+In a real game (a world hosted from the game, Kiln 0.2.0-dev.28 test build, with the `"preview"` line above): placing
+more Flame Altars than the game's number for the world's Flame level, past 16 with `beyondSixteen` too, and the
+`/altars` window.
 
-- placing more altars (or water sources) than the game's number for the world's Flame level;
-- what the Flame Altar menu shows, and a joining player with and without the mod;
+Not checked yet, because it needs more players:
+
+- placing more water sources than the game's number;
+- a joining player with and without the mod;
 - removing the mod from a world that has more altars than the game's number allows (the altars should stay, and no new
   one can be placed until the Flame level allows it).
 
