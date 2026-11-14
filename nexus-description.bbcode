@@ -1,0 +1,62 @@
+[center][size=5][b][color=#FF6A1A]More Flame Altars[/color][/b][/size]
+[size=3][color=#D4D4D8]Found every base from day one: 16 Flame Altars at every Flame level.[/color][/size]
+
+[size=2][b][color=#F9C74F]NEEDS KILN 0.2.0-dev.28+[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]SERVER + EVERY PLAYER[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]MIT[/color][/b][/size][/center]
+
+[center][url=https://discord.gg/7pjr8SMTfU][img]https://frostdev.io/kiln/discord-banner.png[/img][/url]
+[size=2][color=#A1A1AA]Questions, bug reports and ideas: the Kiln Discord.[/color][/size][/center]
+[line]
+[size=5][b][color=#FF6A1A]Description[/color][/b][/size]
+[size=3][color=#D4D4D8]Enshrouded ties the number of Flame Altars (bases) to your world's Flame level: a new world allows 2, and you only reach 16 at Flame level 11. [b]More Flame Altars[/b] allows 16 from the very first Flame level, so you can settle every spot you like from the start. Or keep the game's progression and add a few on top.[/color][/size]
+
+[list]
+[*][size=3][color=#D4D4D8][b]Altars:[/b] at least 16 at every Flame level (default), or any number from 1 to 16[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Extra altars:[/b] the game's own number plus a few at every level, for the game's progression with more room[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Water sources:[/b] optionally more water sources at every level, up to the game's own top of 50[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]/altars:[/b] type it in the chat for a window with your world's Flame level, the altars and water sources placed and allowed, and the numbers at every Flame level. Admins change the settings and the world's Flame level right there; everyone else can look[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Never less:[/b] a level never gets fewer than the game gives it, and with every setting at its lowest the mod changes nothing[/color][/size][/*]
+[/list]
+
+[size=3][color=#D4D4D8]The game's numbers, and the mod's default:[/color][/size]
+[code]Flame level        0   1   2   3   4   5   6   7   8   9  10  11+
+The game           1   2   4   6   8  10  11  12  13  14  15  16
+More Flame Altars 16  16  16  16  16  16  16  16  16  16  16  16[/code]
+
+[quote][size=3][b][color=#F9C74F]Why not unlimited?[/color][/b]
+[color=#D4D4D8]The game is built for 16 bases. Its own code allows at most 16 Flame Altars, and the part of the game that runs bases (comfort, crafting from base chests, survivors' beds, animals, the journal's base list) has room for exactly 16. Tools that switch "unlimited altars" on give you altars that are bases in name only past the 16th, and one of them is reported to crash the game past 36.
+
+So the mod stays at 16. For those who want more anyway, there is an [b]experimental[/b] switch, [b]beyondSixteen[/b] (off by default, admins only): up to 32 altars, where altars 17 and up only let you build. They get no comfort, no crafting from base chests, no survivor beds, no animals and no journal entry, and which altars those are can change after a reload.[/color][/size][/quote]
+[line]
+[size=5][b][color=#FF6A1A]Installation instructions[/color][/b][/size]
+[size=3][color=#D4D4D8]This mod needs [url=https://www.nexusmods.com/enshrouded/mods/301][color=#F9C74F]Kiln[/color][/url] [b]0.2.0-dev.28 or later[/b], on the server and on every player's game: the game reads these numbers on both sides.[/color][/size]
+
+[size=4][b][color=#F9C74F]Dedicated server[/color][/b][/size]
+[size=3][color=#D4D4D8]Unzip it into the server's [b]kiln/mods/[/b] folder and restart the server. The settings are in [b]kiln/config/more-flame-altars.json[/b] (or in /altars) and apply at the next start. Players who join need the mod too; a server's Kiln modpack can hand it to them.[/color][/size]
+
+[size=4][b][color=#F9C74F]Playing on your own, or hosting[/color][/b][/size]
+[list=1]
+[*][size=3][color=#D4D4D8]Open the Kiln Launcher's [b]Library[/b] page and drop in the zip from the Files tab.[/color][/size][/*]
+[*][size=3][color=#D4D4D8]Add it to your profile under [b]Profiles[/b], then press [b]Play[/b].[/color][/size][/*]
+[/list]
+[size=3][color=#D4D4D8]On a world you host from your own game, Kiln 0.2.0-dev.28 keeps start-up changes like this one switched off until they have passed their test in a real game. Until a Kiln update switches it on, add [b]"preview": ["mods.boot.resource_patches"][/b] to [b]kiln/kiln.json[/b] in your game folder to use it on your own world. /altars says when the mod is not active and why.[/color][/size]
+[line]
+[size=5][b][color=#FF6A1A]Settings[/color][/b][/size]
+[list]
+[*][size=3][color=#D4D4D8][b]altars[/b] (16): at least this many Flame Altars at every Flame level[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]extraAltars[/b] (0): added to the game's own number at every level[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]waterSources[/b] (0): at least this many water sources at every level; 0 leaves the game's numbers[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]extraWaterSources[/b] (0): added to the game's own number of water sources[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]beyondSixteen[/b] (off): experimental, more than 16 altars, see above[/color][/size][/*]
+[/list]
+[size=3][color=#D4D4D8]Admins can also use [b]/altars set <setting> <value>[/b] and [b]/altars flame <level>[/b] in the chat or from the server console.[/color][/size]
+[line]
+[quote][size=3][b][color=#F9C74F]Good to know[/color][/b]
+[/size]
+[list]
+[*][size=3][color=#D4D4D8][b]Nothing is written to the game's files or your save.[/b] Kiln changes the numbers each time the game starts, before the game reads them. Remove the mod and the next start has the game's numbers again. Altars you already placed should stay; you just cannot place new ones until your Flame level allows it.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Every player needs the mod.[/b] A game without it shows and enforces the game's own numbers on its side.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Do not combine it[/b] with another tool that changes the altar limit or rewrites the game's data files (the Embervale Toolkit's altar switch and its "Tweaks" tab, for example).[/color][/size][/*]
+[/list]
+[/quote]
+
+[size=2][color=#A1A1AA]Unofficial, and not affiliated with or endorsed by Keen Games.[/color][/size]

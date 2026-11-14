@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "side": "client",
+  "comment": "More Flame Altars' own symbol, loaded only when altars above 16 are switched on (Symbols.LoadShipped). AltarLimit is the game's altar-limit function: min(BalancingTable.altarsPerFlameLevel[flameLevel], 16), BalancingRegistry* in rcx, the Flame level in edx, the limit as a zero-extended u32 in eax (server 0x93dea0 / client 0xe96c80 on builds 26430253 / 26430625; identical bytes on both sides). altars.table is the table's offset of altarsPerFlameLevel (0x1b8).",
+  "symbols": {
+    "more-flame-altars/AltarLimit": {
+      "find": [
+        { "pattern": "48 8B 41 20 48 85 C0 75 06 B8 01 00 00 00 C3 48 05 {more-flame-altars/altars.table:d32} 48 63 08 85 C9 75 13 33 C9 8B C2 0F B6 04 08 B9 10 00 00 00 3A C1 0F 47 C1 C3" }
+      ]
+    }
+  },
+  "constants": { "more-flame-altars/altars.table": { "min_votes": 1 } }
+}

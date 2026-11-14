@@ -1,0 +1,35 @@
+<Project Sdk="Kiln.Sdk/0.2.0-dev.28">
+  <!-- More Flame Altars: 16 Flame Altars at every Flame level. One boot-time change of the game's balancing table
+       (Mod.OnBoot, a ResourcePatchBlock): Kiln 0.2.0-dev.28 or later.
+         dotnet build -t:KilnDeploy -p:KilnServer=<server folder>
+         dotnet build -c Release -t:KilnPack -p:KilnPackageOutputPath=dist/      (the zip the launcher's Library imports)
+       KilnBoot writes "boot": true into the generated kiln.mod.json: the mod's OnBoot runs before the game reads its data.
+       The Kiln.Sdk version above must be one your NuGet feed has (nuget.config): the Kiln release's sdk/ folder. -->
+  <PropertyGroup>
+    <KilnModId>more-flame-altars</KilnModId>
+    <KilnModName>More Flame Altars</KilnModName>
+    <Version>0.2.0</Version>
+    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting.</Description>
+    <Authors>Frostdev</Authors>
+    <AssemblyName>MoreFlameAltars</AssemblyName>
+    <RootNamespace>MoreFlameAltars</RootNamespace>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <KilnSide>both</KilnSide>
+    <!-- the balancing table is read by the server and by every player's game: both need the mod -->
+    <KilnClients>mod</KilnClients>
+    <!-- the game reads the table once, at its start: the change is made in the boot phase -->
+    <KilnBoot>true</KilnBoot>
+    <!-- Kiln.Hooks for beyondSixteen (the game's altar-limit function; off by default): needs the advanced tier -->
+    <KilnAdvanced>true</KilnAdvanced>
+    <KilnServices>Blocks;Quests;Network;Ui;Chat;Permissions;Hooks</KilnServices>
+    <KilnGameIds>None</KilnGameIds>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- tests/LabTest is its own mod (a lab check), built separately; eml/ is the start-up data version for older Kiln -->
+    <Compile Remove="tests/**" />
+    <None Remove="tests/**" />
+    <None Remove="eml/**" />
+    <None Remove="dist/**" />
+    <None Include="sigdb/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

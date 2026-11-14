@@ -1,0 +1,9 @@
+{
+  "id": "more-flame-altars",
+  "name": "More Flame Altars",
+  "version": "0.1.0",
+  "capabilities": ["patch"],
+  "authors": ["Frostdev"],
+  "description": "More Flame Altars for your world: 16 at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is the first line of src/mod.lua.",
+  "license": "MIT"
+}
