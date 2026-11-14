@@ -109,6 +109,7 @@ def lettering(image: Image.Image, text: str, xy: tuple[int, int],
     ink = Image.new("RGBA", image.size, color)
     ink.putalpha(mask)
     image.alpha_composite(ink)
+    return mask.getbbox()
 
 
 def save(image: Image.Image, name: str, text: list[str]):
@@ -152,9 +153,14 @@ def make_social():
     image = gradient_scrim(image, [(0, 130), (.33, 100), (.6, 0), (1, 0)])
     image = gradient_scrim(image, [(0, 0), (.8, 0), (1, 70)], vertical=True)
     title_font = font_to_fit("More Flame", BOLD, 100, 610)
-    lettering(image, "More Flame\nAltars", (64, 185), title_font, line_spacing=7)
-    lettering(image, SOCIAL_LINE, (67, 444), ImageFont.truetype(REGULAR, 30),
-              SECONDARY_COLOR, shadow_offset=(0, 2))
+    boxes = [
+        lettering(image, "More Flame\nAltars", (112, 185), title_font, line_spacing=7),
+        lettering(image, SOCIAL_LINE, (115, 444), ImageFont.truetype(REGULAR, 30),
+                  SECONDARY_COLOR, shadow_offset=(0, 2)),
+    ]
+    # GitHub crops social cards: keep every letter 40pt (80 px here) inside the edges.
+    for left, top, right, bottom in boxes:
+        assert left >= 80 and top >= 80 and right <= 1200 and bottom <= 560, (left, top, right, bottom)
     save(image, "github_social_1280x640.png", [TITLE, SOCIAL_LINE])
     # GitHub's social preview takes at most 1 MB; the PNG is larger.
     jpg = OUT / "github_social_1280x640.jpg"
