@@ -22,6 +22,9 @@ public sealed partial class MoreFlameAltarsMod
     private volatile string _result = "";
     private volatile bool _resultOk = true;
     private int[]? _booted;                    // the settings this game started with (its own table)
+    private readonly object _uiLock = new();
+    private bool _resetEdits;
+    private uint _uiSession;
 
     private void OpenWindow()
     {
@@ -32,10 +35,17 @@ public sealed partial class MoreFlameAltarsMod
     /// <summary>Client: a new state from the server (main thread).</summary>
     private void OnState(AltarsState s)
     {
-        var first = _state is null || s.Open;
+        lock (_uiLock) ApplyState(s);
+    }
+
+    private void ApplyState(AltarsState s)
+    {
+        var first = _state is null || s.Open || _resetEdits;
+        _uiSession = Client.ClientWorldSession;
         _state = s;
         if (first)
         {
+            _resetEdits = false;
             _edit = (int[])s.Saved.Clone();
             _flameEdit = s.FlameLevel;
             _flameSure = false;
@@ -49,15 +59,45 @@ public sealed partial class MoreFlameAltarsMod
 
     private void OnResult(AltarsResult r)
     {
+        lock (_uiLock) ApplyResult(r);
+    }
+
+    private void ApplyResult(AltarsResult r)
+    {
         _resultOk = r.Ok;
         _result = r.Text;
-        if (r.Ok) _edit = null;  // the next state brings the saved values
+        if (r.Ok) _resetEdits = true;  // reset only when the next state brings the new saved values
         if (!_window?.Open ?? true) Hud.Toast(r.Text, r.Ok ? ToastKind.Success : ToastKind.Warning);
+    }
+
+    private void ResetWindow()
+    {
+        lock (_uiLock)
+        {
+            _window?.Hide();
+            _state = null;
+            _edit = null;
+            _flameEdit = -1;
+            _flameSure = false;
+            _resetEdits = false;
+            _result = "";
+        }
     }
 
     private void Send(AltarsAction action, int[]? settings = null, int level = 0)
     {
-        if (_ch is null || !_ch.SendToServer(new AltarsRequest(action, settings ?? new int[SettingIndex.Count], level)))
+        var request = new AltarsRequest(action, settings ?? new int[SettingIndex.Count], level);
+        if (Client.IsHosting && !Client.LocalPlayer.IsNone)
+        {
+            var player = Client.LocalPlayer;
+            var session = Client.ServerWorldSession;
+            Context.Scheduler.Post(() =>
+            {
+                if (IsLocalHost(player) && session == Client.ServerWorldSession) OnRequest(request, player);
+            });
+            return;
+        }
+        if (_ch is null || !_ch.SendToServer(request))
         {
             _resultOk = false;
             _result = "The server did not take the request (not connected to a server with More Flame Altars).";
@@ -65,6 +105,15 @@ public sealed partial class MoreFlameAltarsMod
     }
 
     private void Draw(UiDraw ui)
+    {
+        lock (_uiLock)
+        {
+            if (!Client.InGame || _uiSession != Client.ClientWorldSession) { ResetWindow(); return; }
+            DrawWindow(ui);
+        }
+    }
+
+    private void DrawWindow(UiDraw ui)
     {
         var s = _state;
         if (s is null)
@@ -88,7 +137,7 @@ public sealed partial class MoreFlameAltarsMod
         }
         if (!s.Active) ui.Text(Color.Orange, "The mod's numbers are not active in this start.");
         if (s.Note.Length > 0) ui.TextWrapped(s.Note);
-        if (_booted is { } mine && !mine.SequenceEqual(s.Running) && !s.Hosted)
+        if (_booted is { } mine && !mine.SequenceEqual(s.Running) && !Client.IsHosting)
             ui.TextWrapped("Your game started with other settings than the server's (yours: " + Describe(SettingIndex.From(mine)) +
                            "). Your game may then show or allow other numbers than the server. Set the same settings in your game " +
                            "(Kiln menu > Mods > More Flame Altars > Config) and restart it.");
@@ -129,7 +178,7 @@ public sealed partial class MoreFlameAltarsMod
             if (ui.Button("Undo")) _edit = (int[])s.Saved.Clone();
             ui.SameLine();
             if (ui.Button("Defaults")) _edit = SettingIndex.Of(new Settings());
-            ui.TextDisabled(s.Hosted ? "Saved settings apply when you start the game again." : "Saved settings apply when the server starts again.");
+            ui.TextDisabled(s.Hosted ? "Saved settings apply when the host starts the game again." : "Saved settings apply when the server starts again.");
         }
         else
         {

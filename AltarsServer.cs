@@ -2,6 +2,7 @@
 // The server's part of the management window: the /altars command, the state it sends, and the actions it takes for a
 // player who may manage (more-flame-altars.manage, admins by default). On a world a player hosts this runs in their game.
 using Kiln;
+using System.Text.Json;
 
 namespace MoreFlameAltars;
 
@@ -22,7 +23,12 @@ public sealed partial class MoreFlameAltarsMod
             .Register<AltarsRequest>((m, ctx) => OnRequest(m, ctx.Player), NetDirection.ToServer)
             .Register<AltarsResult>((m, _) => OnResult(m), NetDirection.ToClient)
             .Register<AltarsLimits>((m, _) => OnLimits(m), NetDirection.ToClient);
-        Network.Disconnected += _ => AltarLimitHook.SetServer(null);
+        Network.Disconnected += _ =>
+        {
+            AltarLimitHook.SetServer(null);
+            AltarLimitHook.SetCap(CapOf(Cfg().Value));
+            ResetWindow();
+        };
     }
 
     /// <summary>Server: a Kiln client with the mod joined; tell it the limit at each Flame level, so its altar cursor and
@@ -49,6 +55,11 @@ public sealed partial class MoreFlameAltarsMod
     [Command("altars", Description = "Opens the Flame Altars window: this world's Flame level, altars, water sources and the mod's settings")]
     private string AltarsCommand(CommandContext c)
     {
+        if (c.Source.IsPlayer && IsLocalHost(c.Source.Player) && _window is not null)
+        {
+            SendState(c.Source.Player, open: true);
+            return "";
+        }
         if (c.Source.IsPlayer && Network.PeerOf(c.Source.Player) is { } peer && peer.HasChannel(Channel)
             && _ch!.SendTo(c.Source.Player, Snapshot(c.Source.Player, open: true)))
             return "";  // the window opens; nothing to say in chat
@@ -56,7 +67,7 @@ public sealed partial class MoreFlameAltarsMod
     }
 
     [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1); it applies at the next start",
-        Permission = CommandPermission.Admin)]
+        Permission = CommandPermission.Admin, Node = ManageNode)]
     private string SetCommand(CommandContext c, string setting, int value)
     {
         var path = SettingIndex.Paths.FirstOrDefault(p => p.Equals(setting.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -65,15 +76,27 @@ public sealed partial class MoreFlameAltarsMod
             c.Fail($"no setting '{setting}': {string.Join(", ", SettingIndex.Paths)}");
             return "";
         }
+        var values = Saved(Cfg());
+        values[Array.IndexOf(SettingIndex.Paths, path)] = value;
+        if (!SettingIndex.Validate(values, out var validation))
+        {
+            c.Fail(validation);
+            return "";
+        }
         if (!Cfg().TrySet(path, path == "beyondSixteen" ? value != 0 : value, out var error))
         {
             c.Fail($"{path} not changed: {error}");
             return "";
         }
+        if (!SavedOnDisk(Cfg(), out error))
+        {
+            c.Fail(error);
+            return "";
+        }
         return $"{path} = {value}, saved. {AppliesWhen()}";
     }
 
-    [Command("altars flame", Description = "Sets the world's Flame level (1 to its maximum)", Permission = CommandPermission.Admin)]
+    [Command("altars flame", Description = "Sets the world's Flame level (1 to its maximum)", Permission = CommandPermission.Admin, Node = ManageNode)]
     private async Task FlameCommand(CommandContext c, int level)
     {
         var (ok, text) = await SetFlame(level);
@@ -85,10 +108,25 @@ public sealed partial class MoreFlameAltarsMod
 
     private static string NameOf(EntityId player) => Network.PeerOf(player)?.Name ?? player.ToString();
 
-    private static bool Hosted => Ui.Available;  // the server world runs in a player's game
+    private static bool Hosted => Client.IsHosting;
+
+    private static bool IsLocalHost(EntityId player) => Hosted && !player.IsNone && player == Client.LocalPlayer;
+
+    private void SendState(EntityId player, bool open = false)
+    {
+        var state = Snapshot(player, open);
+        if (IsLocalHost(player)) OnState(state);
+        else _ch!.SendTo(player, state);
+    }
+
+    private void SendResult(EntityId player, AltarsResult result)
+    {
+        if (IsLocalHost(player)) OnResult(result);
+        else _ch!.SendTo(player, result);
+    }
 
     private string AppliesWhen() => Hosted
-        ? "The new numbers apply when you start the game again."
+        ? "The new numbers apply when the host starts the game again."
         : "The new numbers apply when the server starts again.";
 
     /// <summary>The window's state for <paramref name="player"/> (tick thread).</summary>
@@ -104,14 +142,16 @@ public sealed partial class MoreFlameAltarsMod
         for (var level = 0; level <= max && level < 64; level++)
         {
             if (WorldProgress.LimitsAt(level) is not { } l) break;
-            altarsBy.Add((byte)Math.Clamp(l.Altars, 0, 255));
+            altarsBy.Add((byte)Math.Clamp(l.Altars, 0, AltarLimitHook.Installed ? AltarHardCap : AltarCap));
             waterBy.Add((byte)Math.Clamp(l.WaterSources, 0, 255));
         }
         var allowed = flame is null ? null : WorldProgress.LimitsAt(flame.Level);
         var (active, note) = Activity(cfg.Value);
         if (!running.SequenceEqual(saved)) note = (note.Length > 0 ? note + " " : "") + "Saved settings differ from the running ones. " + AppliesWhen();
         return new AltarsState(open, Permissions.Has(player, ManageNode), Hosted, active, note,
-            flame?.Level ?? -1, max, flame?.Altars ?? -1, allowed?.Altars ?? -1, flame?.WaterSources ?? -1, allowed?.WaterSources ?? -1,
+            flame?.Level ?? -1, max, flame?.Altars ?? -1,
+            allowed is null ? -1 : Math.Min(allowed.Altars, AltarLimitHook.Installed ? AltarHardCap : AltarCap),
+            flame?.WaterSources ?? -1, allowed?.WaterSources ?? -1,
             running, saved, altarsBy.ToArray(), waterBy.ToArray());
     }
 
@@ -130,12 +170,42 @@ public sealed partial class MoreFlameAltarsMod
         return v;
     }
 
+    // dev.28's TrySet logs a failed write but still returns true. Confirm persistence before claiming it was saved.
+    private static bool SavedOnDisk(ModConfig<Settings> cfg, out string error)
+    {
+        try
+        {
+            using var file = JsonDocument.Parse(File.ReadAllText(cfg.FilePath), new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true,
+            });
+            var saved = Saved(cfg);
+            for (var i = 0; i < SettingIndex.Count; i++)
+            {
+                var value = file.RootElement.GetProperty(SettingIndex.Paths[i]);
+                if ((i == SettingIndex.BeyondSixteen ? (value.GetBoolean() ? 1 : 0) : value.GetInt32()) != saved[i])
+                    throw new InvalidDataException("The file does not contain the requested settings.");
+            }
+            error = "";
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or
+                                  KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            error = $"Could not confirm the settings were saved: {e.Message}";
+            return false;
+        }
+    }
+
     /// <summary>Whether this start runs with the mod's numbers, and why not.</summary>
     private (bool Active, string Note) Activity(Settings s)
     {
         if (Patch(s) is null) return (true, "The settings leave the game's own numbers.");
         var state = Mods.BootState(Context.Info.Id);
-        if (state.State == BootModState.Committed) return (true, "");
+        if (state.State == BootModState.Committed)
+            return s.BeyondSixteen && !AltarLimitHook.Installed
+                ? (false, "The data patch is active, but the experimental hook is unavailable: altar placement is capped at 16.")
+                : (true, "");
         var why = state.Issues.Count > 0 ? state.Issues[0].Reason : state.State.ToString();
         if (!Capabilities.Is("mods.boot.resource_patches"))
             why = Capabilities.Why("mods.boot.resource_patches") +
@@ -156,21 +226,21 @@ public sealed partial class MoreFlameAltarsMod
     {
         if (m.Action == AltarsAction.Refresh)
         {
-            _ch!.SendTo(player, Snapshot(player, open: false));
+            SendState(player);
             return;
         }
         if (!Permissions.Has(player, ManageNode))
         {
-            _ch!.SendTo(player, new AltarsResult(false, $"Only admins may change this (permission {ManageNode})."));
+            SendResult(player, new AltarsResult(false, $"Only admins may change this (permission {ManageNode})."));
             return;
         }
         switch (m.Action)
         {
             case AltarsAction.SaveSettings:
                 var (ok, text) = SaveSettings(m.Settings);
-                Log.Info($"More Flame Altars: {NameOf(player)} saved settings: {text}");
-                _ch!.SendTo(player, new AltarsResult(ok, text));
-                _ch.SendTo(player, Snapshot(player, open: false));
+                Log.Info($"More Flame Altars: {NameOf(player)} settings request: {text}");
+                SendResult(player, new AltarsResult(ok, text));
+                SendState(player);
                 break;
             case AltarsAction.SetFlameLevel:
                 _ = SetFlameFor(player, m.FlameLevel);
@@ -180,25 +250,30 @@ public sealed partial class MoreFlameAltarsMod
 
     private (bool Ok, string Text) SaveSettings(int[] values)
     {
-        if (values.Length != SettingIndex.Count) return (false, "The window sent the wrong number of settings.");
+        if (!SettingIndex.Validate(values, out var validation)) return (false, validation);
         var cfg = Cfg();
         var paths = SettingIndex.Paths;
         var errors = new List<string>();
         for (var i = 0; i < paths.Length; i++)
             if (!cfg.TrySet(paths[i], i == SettingIndex.BeyondSixteen ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
-        return errors.Count > 0
-            ? (false, "Not saved: " + string.Join("; ", errors))
-            : (true, $"Saved: {Describe(SettingIndex.From(values))}. {AppliesWhen()}");
+        if (errors.Count > 0) return (false, "Some settings could not be saved: " + string.Join("; ", errors));
+        return SavedOnDisk(cfg, out var errorText)
+            ? (true, $"Saved: {Describe(SettingIndex.From(values))}. {AppliesWhen()}")
+            : (false, errorText);
     }
 
     private async Task SetFlameFor(EntityId player, int level)
     {
+        var peer = Network.PeerOf(player);
+        var session = Client.ServerWorldSession;
         var (ok, text) = await SetFlame(level);
-        Log.Info($"More Flame Altars: {NameOf(player)} set the Flame level to {level}: {text}");
         Context.Scheduler.Post(() =>
         {
-            _ch!.SendTo(player, new AltarsResult(ok, text));
-            _ch.SendTo(player, Snapshot(player, open: false));
+            if (peer is not null ? !ReferenceEquals(peer, Network.PeerOf(player))
+                : !IsLocalHost(player) || session != Client.ServerWorldSession) return;
+            Log.Info($"More Flame Altars: {NameOf(player)} set the Flame level to {level}: {text}");
+            SendResult(player, new AltarsResult(ok, text));
+            SendState(player);
         });
     }
 

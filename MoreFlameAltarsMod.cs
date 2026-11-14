@@ -14,7 +14,7 @@ public sealed class Settings
     public int Altars { get; set; } = 16;
 
     [Comment("Flame Altars added to the game's own number at every Flame level, up to 16 (32 with beyondSixteen). With " +
-             "Altars at 1 and this at 2, a new world allows 3, Flame level 2 allows 6, and so on: the game's progression " +
+             "Altars at 1 and this at 2, Flame level 0 allows 3, a new world (level 1) allows 4, level 2 allows 6: the game's progression " +
              "with a little more room. 0 adds none."),
      Range(0, 31), RequiresRestart]
     public int ExtraAltars { get; set; }

@@ -2,7 +2,6 @@
 // In-server checks with no player: `kiln test more-flame-altars-labtest`. More Flame Altars changes the game's balancing
 // table before the game reads it (Kiln's boot phase), so these read what the running game holds and compare it with what
 // the mod's settings ask for. Whether a player may then place that many altars needs a player: README.md, "What is checked".
-using System.Text.RegularExpressions;
 using Kiln;
 using Kiln.Testing;
 using Assert = Kiln.Testing.Assert;
@@ -23,20 +22,15 @@ public sealed class Tests
     private static readonly int[] GameAltars = [1, 2, 4, 6, 8, 10, 11, 12, 13, 14, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16];
     private static readonly int[] GameWater = [1, 1, 1, 1, 5, 10, 20, 30, 40, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50];
 
-    /// <summary>The mod's settings as its config file says (kiln/config/more-flame-altars.json), else its defaults.</summary>
-    private static readonly (int Altars, int ExtraAltars, int Water, int ExtraWater, bool Beyond) S = ReadSettings();
+    /// <summary>The registered running settings, including when file edits are waiting for a restart.</summary>
+    private static (int Altars, int ExtraAltars, int Water, int ExtraWater, bool Beyond) S => ReadSettings();
 
     private static (int, int, int, int, bool) ReadSettings()
     {
-        var file = Path.Combine(Mods.Get(ModId)?.Directory ?? ".", "..", "..", "config", ModId + ".json");
-        var text = File.Exists(file) ? File.ReadAllText(file) : "";
-        int Get(string key, int fallback)
-        {
-            var m = Regex.Match(text, $"\"{key}\"\\s*:\\s*(\\d+)");
-            return m.Success ? int.Parse(m.Groups[1].Value) : fallback;
-        }
-        var beyond = Regex.IsMatch(text, "\"beyondSixteen\"\\s*:\\s*true");
-        return (Get("altars", 16), Get("extraAltars", 0), Get("waterSources", 0), Get("extraWaterSources", 0), beyond);
+        var cfg = Assert.NotNull(Config.Find(ModId), "More Flame Altars registered its config");
+        return (Convert.ToInt32(cfg.Get("altars")), Convert.ToInt32(cfg.Get("extraAltars")),
+            Convert.ToInt32(cfg.Get("waterSources")), Convert.ToInt32(cfg.Get("extraWaterSources")),
+            Convert.ToBoolean(cfg.Get("beyondSixteen")));
     }
 
     /// <summary>What the mod makes of the game's value: plus extra, at least atLeast, at most cap, never below the game's.</summary>

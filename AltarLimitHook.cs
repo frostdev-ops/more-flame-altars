@@ -16,7 +16,15 @@ namespace MoreFlameAltars;
 public sealed record AltarsLimits(bool Beyond, byte[] ByLevel) : INetMessage<AltarsLimits>
 {
     public void Encode(NetWriter w) => w.Bool(Beyond).Bytes(ByLevel);
-    public static AltarsLimits Decode(ref NetReader r) => new(r.Bool(), r.Bytes(64));
+    public static AltarsLimits Decode(ref NetReader r)
+    {
+        var beyond = r.Bool();
+        var by = r.Bytes(64);
+        var cap = beyond ? MoreFlameAltarsMod.AltarHardCap : MoreFlameAltarsMod.AltarCap;
+        if (by.Length == 0 || by.Any(v => v < 1 || v > cap))
+            throw new NetFormatException("Invalid server altar limits.");
+        return new(beyond, by);
+    }
 }
 
 internal static class AltarLimitHook

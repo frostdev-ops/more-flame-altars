@@ -14,6 +14,20 @@ internal static class SettingIndex
 
     public static int[] Of(Settings s) => [s.Altars, s.ExtraAltars, s.WaterSources, s.ExtraWaterSources, s.BeyondSixteen ? 1 : 0];
 
+    public static bool Validate(IReadOnlyList<int> values, out string error)
+    {
+        error = "";
+        if (values.Count != Count) { error = "Wrong number of settings."; return false; }
+        int[] minimum = [1, 0, 0, 0, 0], maximum = [32, 31, 50, 49, 1];
+        for (var i = 0; i < Count; i++)
+            if (values[i] < minimum[i] || values[i] > maximum[i])
+            {
+                error = $"{Paths[i]} must be {minimum[i]} to {maximum[i]}.";
+                return false;
+            }
+        return true;
+    }
+
     public static Settings From(IReadOnlyList<int> v) => new()
     {
         Altars = v[Altars], ExtraAltars = v[ExtraAltars], WaterSources = v[WaterSources], ExtraWaterSources = v[ExtraWaterSources],
@@ -50,8 +64,13 @@ public sealed record AltarsState(
         for (var i = 0; i < running.Length; i++) running[i] = r.Int32();
         var saved = new int[SettingIndex.Count];
         for (var i = 0; i < saved.Length; i++) saved[i] = r.Int32();
+        var altarsBy = r.Bytes(64);
+        var waterBy = r.Bytes(64);
+        if (altarsBy.Length != waterBy.Length || max is < 1 or > 255 || level < -1 || level > max ||
+            !SettingIndex.Validate(running, out _) || !SettingIndex.Validate(saved, out _))
+            throw new NetFormatException("Invalid altar window state.");
         return new(open, manage, hosted, active, note, level, max, altars, altarsAllowed, water, waterAllowed, running, saved,
-            r.Bytes(64), r.Bytes(64));
+            altarsBy, waterBy);
     }
 }
 

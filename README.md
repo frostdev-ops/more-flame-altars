@@ -47,7 +47,7 @@ server starts: restart after a change.
 | `extraAltars` | 0 | Added to the game's own number at every level, up to 16. |
 | `waterSources` | 0 | At least this many water sources at every level (0 to 50; 0 leaves the game's numbers). |
 | `extraWaterSources` | 0 | Added to the game's own number of water sources at every level, up to 50. |
-| `beyondSixteen` | false | **Experimental.** Allows more than 16 Flame Altars (`altars` and `extraAltars` then go up to 32). See below. |
+| `beyondSixteen` | false | **Experimental.** Allows more than 16 Flame Altars (`altars` then goes up to 32, `extraAltars` to 31). See below. |
 
 A level never gets less than the game gives it. With every setting at its lowest the mod changes nothing.
 
@@ -77,15 +77,17 @@ sources placed and allowed, the numbers at every Flame level, and the mod's sett
 `more-flame-altars.manage`) can change the settings there (they apply at the next start of the server, or of your game
 when you host) and set the world's Flame level. The window also has the `beyondSixteen` switch, with its warning. Everyone else sees the same window, read only.
 
-Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources> <value>`
-and `/altars flame <level>`. From the console, `/altars` prints a one-line summary.
+Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen> <value>`
+(use 0 or 1 for `beyondSixteen`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
+as the window. From the console, `/altars` prints a one-line summary.
 
 ## How it works
 
 The numbers are lists in the game's balancing table (`keen::BalancingTable`: `altarsPerFlameLevel` and
 `waterSourcesPerFlameLevel`, one number per Flame level). The game reads that table once, at its start, so the mod
-changes it in Kiln's boot phase (`Mod.OnBoot`, a resource patch), before the game reads it. Nothing is written to the
-game's files or to your save: remove the mod and the next start has the game's numbers again.
+changes it in Kiln's boot phase (`Mod.OnBoot`, a resource patch), before the game reads it. The limit patch does not
+rewrite the game's files or your save: remove the mod and the next start has the game's numbers again. Changing the
+world's Flame level through `/altars` does change world progress and is saved by the game.
 
 ## What is checked
 
@@ -119,17 +121,20 @@ server and in every player's game. Do not use 0.1.0 and 0.2.0 at once: 0.2.0 rep
 Checked on a lab server with Kiln 0.2.0-dev.27 (the running game's table had 16 at every level); placing the altars in
 a player's game is not checked yet.
 
-To make its zip: `cd eml && zip -r ../dist/more-flame-altars-0.1.0.zip mod.json src`.
+To make its zip: `mkdir -p dist && (cd eml && zip -r ../dist/more-flame-altars-0.1.0.zip mod.json src)`.
 
 ## Development
 
 ```sh
 ln -s ~/Kiln-release/kiln-0.2.0-dev.28/sdk kiln-sdk        # the SDK
 dotnet build -c Release -t:KilnPack -p:KilnPackageOutputPath=dist/
+# managed regression checks; no game server needed
+dotnet run --project tests/Offline -c Release
 # lab check (a lab made with Kiln's tools/lab/lab.sh, Kiln 0.2.0-dev.28 in it)
-dotnet build -c Release -t:KilnDeploy -p:KilnServer=<lab folder>
-(cd tests/LabTest && dotnet build -c Release -t:KilnDeploy -p:KilnServer=<lab folder>)
-kiln run --server <lab> --wait 300 && kiln test more-flame-altars-labtest --server <lab> && kiln run --server <lab> --stop
+lab=/path/to/lab
+dotnet build -c Release -t:KilnDeploy -p:KilnServer="$lab"
+(cd tests/LabTest && dotnet build -c Release -t:KilnDeploy -p:KilnServer="$lab")
+kiln run --server "$lab" --wait 300 && kiln test more-flame-altars-labtest --server "$lab" && kiln run --server "$lab" --stop
 ```
 
 `art/` holds the banners and thumbnails (`art/compose.py` rebuilds them from `art/source/`, made with an image
