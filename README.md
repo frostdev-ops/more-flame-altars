@@ -27,9 +27,20 @@ Kiln 0.2.0-dev.28 or later, on the server and on every player's game: the game r
 player without the mod would see and be held to the game's own numbers. Kiln's modpack hands the mod to players who
 join a Kiln server.
 
-On a world you host from your own game, Kiln keeps start-up changes like this one switched off until they have passed
-their test in a real game (`mods.boot.resource_patches`, "game test pending"). To try it on your own world before that,
-add `"preview": ["mods.boot.resource_patches"]` to `kiln/kiln.json` in the game folder. A dedicated server has it.
+In Kiln 0.2.0-dev.28 a player's game does not load start-up (boot) mods like this one yet: Kiln keeps them switched
+off on game clients until they have passed their test in a real game (`mods.boot.client` and
+`mods.boot.resource_patches`, "game test pending"). A dedicated server has them. What that means:
+
+- **Joining a dedicated server that runs the mod:** the server refuses Kiln players whose game has not loaded the mod,
+  so until those tests pass every player needs one of these two ways in:
+  - the player adds `"preview": ["mods.boot.client", "mods.boot.resource_patches"]` to `kiln/kiln.json` in their game
+    folder, so their game loads the mod; or
+  - the server sets `"modSync": "warn"` in its `kiln/config/network.json`, so players join without the mod. Their game
+    then keeps the game's own numbers: it may not let them place more altars than the game allows at the world's
+    Flame level.
+- **A world you host from your own game:** add the same `"preview"` line to `kiln/kiln.json` in your game folder.
+
+`"preview"` switches on parts of Kiln that are not tested in a real game yet: use it for this, not as a habit.
 
 ## Install
 

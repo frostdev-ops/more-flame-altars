@@ -209,7 +209,7 @@ public sealed partial class MoreFlameAltarsMod
         var why = state.Issues.Count > 0 ? state.Issues[0].Reason : state.State.ToString();
         if (!Capabilities.Is("mods.boot.resource_patches"))
             why = Capabilities.Why("mods.boot.resource_patches") +
-                  (Hosted ? " To try it in your own world: \"preview\": [\"mods.boot.resource_patches\"] in kiln/kiln.json, then restart the game." : "");
+                  (Hosted ? " To try it in your own world: \"preview\": [\"mods.boot.client\", \"mods.boot.resource_patches\"] in kiln/kiln.json, then restart the game." : "");
         return (false, $"Not active in this start: {why}");
     }
 
