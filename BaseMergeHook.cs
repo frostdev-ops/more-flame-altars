@@ -34,6 +34,10 @@ internal static unsafe class BaseMergeHook
 
     private sealed record VecKind(int ElementSize, int InlineOffset, ulong InlineCapacity, bool AnyWithoutAllocator);
 
+    /// <summary>Storage of ours has room for at least this many elements: the world holds at most 255 zones, so a list
+    /// grows once and a reader that saw the old pointer never meets a count past its storage.</summary>
+    private const ulong MinOwned = 256;
+
     private static readonly VecKind BaseZones = new(ZoneSize, 0x30, 16, false);
     private static readonly VecKind UiZones = new(0x48, 0x28, 32, true);      // client: a base's zone records
     private static readonly VecKind UiZoneIndex = new(4, 0x28, 64, true);     // client: a base's zone indices
@@ -64,7 +68,9 @@ internal static unsafe class BaseMergeHook
 
     /// <summary>Switches the merge on or off. Off: the hooks stay in, the next rebuild gives the zone list its 16 slots back
     /// and the game's own bases return. A change asks every base system seen for a rebuild at its next update (the game
-    /// rebuilds when the world's zone version differs from the one at +0x20; XHL retries the same way).</summary>
+    /// rebuilds when the world's zone version differs from the one at +0x20; XHL retries the same way).
+    /// Called on the tick thread, the thread that also creates and destroys the game's base systems, so a system in the
+    /// list is not freed while its version is written.</summary>
     public static void SetEnabled(bool on)
     {
         if (_enabled == on) return;
@@ -131,15 +137,13 @@ internal static unsafe class BaseMergeHook
     public static void Release()
     {
         _enabled = false;
-        foreach (var (vec, o) in _owned) Shrink(vec, o);
-        // a merged base keeps base 0 with a mask the 16 zones left can hold, until the game's next rebuild
+        // Kiln calls OnUnload before it drains the handlers: a query may still read our storage, so none of it is freed
+        // here (a few KB stay allocated until the process ends)
+        foreach (var (vec, o) in _owned) Shrink(vec, o, free: false);
+        // a merged base keeps base 0 with a mask the 16 zones left can hold, and the game is asked to rebuild its bases
         foreach (var pb in _merged.Keys) *(uint*)(pb + Records + RecordMask) = 0xFFFF;
+        foreach (var vec in _zoneLists.Keys) Interlocked.Decrement(ref *(int*)(vec - ZoneList + ZoneVersion));
         _merged.Clear();
-        lock (Retired)
-        {
-            foreach (var b in Retired) NativeMemory.Free((void*)b);
-            Retired.Clear();
-        }
     }
 
     /// <summary>Storage a list grew out of. The game's other threads may still read the old one for a moment, so it is
@@ -157,6 +161,7 @@ internal static unsafe class BaseMergeHook
         if (_owned.TryGetValue(vec, out var o))
         {
             if (capacity <= o.Kind.InlineCapacity) Shrink(vec, o, capacity);
+            else if (capacity <= o.Capacity) *(ulong*)(vec + VecCount) = Math.Min(*(ulong*)(vec + VecCount), capacity);
             else Regrow(vec, o, capacity);
             return 1;
         }
@@ -170,6 +175,7 @@ internal static unsafe class BaseMergeHook
     /// <summary>Moves the list into storage of ours with room for <paramref name="capacity"/>.</summary>
     private static void Take(nuint vec, VecKind kind, ulong capacity)
     {
+        capacity = Math.Max(capacity, MinOwned);
         var count = Math.Min(*(ulong*)(vec + VecCount), capacity);
         var buffer = (nuint)NativeMemory.AllocZeroed((nuint)(capacity * (ulong)kind.ElementSize));
         var from = *(nuint*)(vec + VecPtr);
@@ -182,6 +188,7 @@ internal static unsafe class BaseMergeHook
 
     private static void Regrow(nuint vec, Owned o, ulong capacity)
     {
+        if (capacity <= o.Capacity) return;  // ours has room already (it is at least MinOwned)
         var size = (ulong)o.Kind.ElementSize;
         var count = Math.Min(*(ulong*)(vec + VecCount), capacity);
         var buffer = (nuint)NativeMemory.AllocZeroed((nuint)(capacity * size));
@@ -196,7 +203,7 @@ internal static unsafe class BaseMergeHook
     }
 
     /// <summary>Gives the list its inline storage back, keeping what fits (all of it at most the inline room).</summary>
-    private static void Shrink(nuint vec, Owned o, ulong? capacity = null)
+    private static void Shrink(nuint vec, Owned o, ulong? capacity = null, bool free = true)
     {
         var size = (ulong)o.Kind.ElementSize;
         var cap = Math.Min(capacity ?? o.Kind.InlineCapacity, o.Kind.InlineCapacity);
@@ -207,7 +214,9 @@ internal static unsafe class BaseMergeHook
         *(ulong*)(vec + VecCount) = count;
         *(ulong*)(vec + VecCapacity) = cap;
         _owned.TryRemove(vec, out _);
-        NativeMemory.Free((void*)o.Buffer);
+        // the destructor's resize to 0 is the one place nothing else reads the list; otherwise keep it for late readers
+        if (free && cap == 0) NativeMemory.Free((void*)o.Buffer);
+        else lock (Retired) Retired.Add(o.Buffer);
     }
 
     // ---- rebuild(baseSystem, world): the zone list from the world's zones, then the bases from the zones

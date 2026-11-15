@@ -245,7 +245,9 @@ public sealed class Tests
         }
         finally
         {
-            setEnabled.Invoke(null, [true]);  // also asks the game to rebuild from its own world at its next update
+            // back on whatever happened above; switching it off and on asks the game to rebuild from its own world
+            setEnabled.Invoke(null, [false]);
+            setEnabled.Invoke(null, [true]);
             System.Runtime.InteropServices.NativeMemory.Free(world);
             System.Runtime.InteropServices.NativeMemory.Free(zones);
         }

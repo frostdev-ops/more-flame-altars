@@ -167,7 +167,7 @@ too (then capped at 32), and the `/altars` window.
   when `beyondSixteen` is on): past 16 altar zones all altars become one base, so altars past 16 are real base area
   (XHL's technique, our code). The mod also stops the game's base rebuild from writing a 17th base record over its zone
   list. The window and `/altars set` have the new switch; the risks are stated in the window, here and on the mod page.
-  Players need 0.3.0 too (the window's channel is version 3). Supersedes 0.2.0, which was never released on its own.
+  Players need 0.3.0 too (the window's channel is version 3): a 0.2.0 game and a 0.3.0 server do not talk.
 - **0.2.0** (Kiln 0.2.0-dev.28): the C# version: settings, water sources, `/altars` window and commands, the
   experimental `beyondSixteen` (up to 32, build-only past 16).
 - **0.1.0** (Kiln 0.2.0-dev.27): the start-up data version in `eml/`, 16 altars at every level.

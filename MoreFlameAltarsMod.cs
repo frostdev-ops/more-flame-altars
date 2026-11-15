@@ -86,7 +86,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
             else
                 Log.Warn($"More Flame Altars: altars above 16 could not be switched on ({why}); the game's limit of 16 stays");
         }
-        _mergeWanted = Cfg().Value.BeyondSixteen && Cfg().Value.MergeBases;
+        // merging needs the limit hook too: without it the server tells players it has no more than 16 (no merge)
+        _mergeWanted = Cfg().Value.BeyondSixteen && Cfg().Value.MergeBases && AltarLimitHook.Installed;
         if (_mergeWanted)
         {
             if (BaseMergeHook.Install(out var why))
@@ -136,14 +137,16 @@ public sealed partial class MoreFlameAltarsMod : Mod
     private string ApplyNow()
     {
         _observedSettings = Saved(Cfg());
-        if (!IsServerSide) return "A game that joins a server follows the server's numbers.";
         var saved = SettingIndex.From(_observedSettings);
+        // kept up to date while this game is joined too, so hosting a world later merges by the settings as they are now
+        _mergeWanted = saved.BeyondSixteen && saved.MergeBases && AltarLimitHook.Installed;
+        if (!IsServerSide) return "A game that joins a server follows the server's numbers.";
         var running = Cfg().Value;
         var waterLater = saved.WaterSources != running.WaterSources || saved.ExtraWaterSources != running.ExtraWaterSources;
         string? failed = null;
         // a failure is in the text, which the window's request and /altars set log and answer
         if (!AltarLimitHook.Installed && saved.BeyondSixteen && !AltarLimitHook.Install(HookRules(), out var why)) failed = why;
-        var merge = ApplyMerge(saved.BeyondSixteen && saved.MergeBases);
+        var merge = ApplyMerge(saved.BeyondSixteen && saved.MergeBases && AltarLimitHook.Installed);
         if (!AltarLimitHook.Installed)
             return (failed is null ? AppliesWhen() : $"Altars above 16 could not be switched on now ({failed}). {AppliesWhen()}") + merge;
         AltarLimitHook.SetRules(HookRules());
