@@ -8,8 +8,8 @@
   <PropertyGroup>
     <KilnModId>more-flame-altars</KilnModId>
     <KilnModName>More Flame Altars</KilnModName>
-    <Version>0.2.0</Version>
-    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting.</Description>
+    <Version>0.3.0</Version>
+    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones.</Description>
     <Authors>Frostdev</Authors>
     <AssemblyName>MoreFlameAltars</AssemblyName>
     <RootNamespace>MoreFlameAltars</RootNamespace>
@@ -19,10 +19,16 @@
     <KilnClients>mod</KilnClients>
     <!-- the game reads the table once, at its start: the change is made in the boot phase -->
     <KilnBoot>true</KilnBoot>
-    <!-- Kiln.Hooks for beyondSixteen (the game's altar-limit function; off by default): needs the advanced tier -->
+    <!-- Kiln.Hooks for beyondSixteen (the game's altar-limit function; off by default) and mergeBases (the game's base
+         system, BaseMergeHook.cs): needs the advanced tier -->
     <KilnAdvanced>true</KilnAdvanced>
     <KilnServices>Blocks;Quests;Network;Ui;Chat;Permissions;Hooks;Client</KilnServices>
     <KilnGameIds>None</KilnGameIds>
+    <!-- BaseMergeHook.cs reads and writes the game's base system through pointers -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- nothing to bake (no quests, skill nodes or VFX defined in code); the dev.28 bake host crashes on this machine
+         (KILN032, TypeInitializationException in <Module>), and turning it off leaves the package the same -->
+    <KilnBake>false</KilnBake>
   </PropertyGroup>
   <ItemGroup>
     <!-- lets the analyzers see KilnBoot on early dev.28 SDK builds, which left it out (KILN034); a duplicate is harmless -->

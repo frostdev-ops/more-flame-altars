@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The messages between the server's part of the mod and the window in a player's game (channel "more-flame-altars:ui").
-// Registered in the same order on both sides: AltarsState 0, AltarsRequest 1, AltarsResult 2, AltarsLimits 3.
+// Registered in the same order on both sides: AltarsState 0, AltarsRequest 1, AltarsResult 2, AltarsLimits 3. Channel
+// version 3 since 0.3.0 (mergeBases in the settings and in AltarsLimits).
 using Kiln;
 
 namespace MoreFlameAltars;
@@ -8,17 +9,21 @@ namespace MoreFlameAltars;
 /// <summary>The settings, in the order the messages carry them.</summary>
 internal static class SettingIndex
 {
-    public const int Altars = 0, ExtraAltars = 1, WaterSources = 2, ExtraWaterSources = 3, BeyondSixteen = 4, Count = 5;
+    public const int Altars = 0, ExtraAltars = 1, WaterSources = 2, ExtraWaterSources = 3, BeyondSixteen = 4, MergeBases = 5, Count = 6;
 
-    public static readonly string[] Paths = ["altars", "extraAltars", "waterSources", "extraWaterSources", "beyondSixteen"];
+    public static readonly string[] Paths = ["altars", "extraAltars", "waterSources", "extraWaterSources", "beyondSixteen", "mergeBases"];
 
-    public static int[] Of(Settings s) => [s.Altars, s.ExtraAltars, s.WaterSources, s.ExtraWaterSources, s.BeyondSixteen ? 1 : 0];
+    /// <summary>The on/off settings (0 or 1 in the messages, true or false in the file).</summary>
+    public static bool IsSwitch(int i) => i is BeyondSixteen or MergeBases;
+
+    public static int[] Of(Settings s) =>
+        [s.Altars, s.ExtraAltars, s.WaterSources, s.ExtraWaterSources, s.BeyondSixteen ? 1 : 0, s.MergeBases ? 1 : 0];
 
     public static bool Validate(IReadOnlyList<int> values, out string error)
     {
         error = "";
         if (values.Count != Count) { error = "Wrong number of settings."; return false; }
-        int[] minimum = [1, 0, 0, 0, 0], maximum = [32, 31, 50, 49, 1];
+        int[] minimum = [1, 0, 0, 0, 0, 0], maximum = [128, 127, 50, 49, 1, 1];
         for (var i = 0; i < Count; i++)
             if (values[i] < minimum[i] || values[i] > maximum[i])
             {
@@ -31,7 +36,7 @@ internal static class SettingIndex
     public static Settings From(IReadOnlyList<int> v) => new()
     {
         Altars = v[Altars], ExtraAltars = v[ExtraAltars], WaterSources = v[WaterSources], ExtraWaterSources = v[ExtraWaterSources],
-        BeyondSixteen = v[BeyondSixteen] != 0,
+        BeyondSixteen = v[BeyondSixteen] != 0, MergeBases = v[MergeBases] != 0,
     };
 }
 

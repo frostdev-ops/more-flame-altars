@@ -19,13 +19,14 @@ public sealed partial class MoreFlameAltarsMod
     private void OpenChannel()
     {
         Permissions.Register(ManageNode, PermissionLevel.Admin, "change More Flame Altars' settings and the world's Flame level");
-        _ch = Network.Channel(Channel, "2")
+        _ch = Network.Channel(Channel, "3")
             .Register<AltarsState>((m, _) => OnState(m), NetDirection.ToClient)
             .Register<AltarsRequest>((m, ctx) => OnRequest(m, ctx.Player), NetDirection.ToServer)
             .Register<AltarsResult>((m, _) => OnResult(m), NetDirection.ToClient)
             .Register<AltarsLimits>((m, _) => OnLimits(m), NetDirection.ToClient);
         Network.Disconnected += _ =>
         {
+            if (!IsServerSide) BaseMergeHook.SetEnabled(false);  // a joined game merged because its server did
             AltarLimitHook.SetServer(null);
             AltarLimitHook.SetRules(HookRules());
             ResetWindow();
@@ -50,7 +51,7 @@ public sealed partial class MoreFlameAltarsMod
         var by = new List<byte>();
         for (var level = 0; level < 64 && WorldProgress.LimitsAt(level) is { } l; level++)
             by.Add((byte)Math.Clamp(hooked ? AltarLimitHook.Answer((uint)level, l.Altars) : l.Altars, 1, cap));
-        return new AltarsLimits(cap > AltarCap, by.ToArray());
+        return new AltarsLimits(cap > AltarCap, by.ToArray(), cap > AltarCap && _mergeWanted && BaseMergeHook.Installed);
     }
 
     /// <summary>Client: the server's limits. When they differ from this game's own (above 16, or changed while the server
@@ -58,10 +59,19 @@ public sealed partial class MoreFlameAltarsMod
     private void OnLimits(AltarsLimits m)
     {
         if (Hosted) return;  // a world this game hosts: its own server part answers, in this same process
+        FollowMerge(m.Merge);
         AltarLimitHook.SetServer(m.ByLevel);
         if (AltarLimitHook.Installed || !DiffersFromOwn(m.ByLevel)) return;
         if (!AltarLimitHook.Install(HookRules(), out var why))
             Log.Warn($"More Flame Altars: the server allows other altar numbers than this game's own, but this game cannot follow ({why})");
+    }
+
+    /// <summary>Client: merge the bases as the server does, or the two would disagree about which altar is in which base.</summary>
+    private void FollowMerge(bool merge)
+    {
+        if (merge && !BaseMergeHook.Installed && !BaseMergeHook.Install(out var why))
+            Log.Warn($"More Flame Altars: the server makes more than 16 altar zones one base, but this game cannot follow ({why})");
+        BaseMergeHook.SetEnabled(merge && BaseMergeHook.Installed);
     }
 
     private static bool DiffersFromOwn(byte[] server)
@@ -93,7 +103,7 @@ public sealed partial class MoreFlameAltarsMod
         return Summary() + (c.Source.IsPlayer ? " (the window needs More Flame Altars in your game)" : "");
     }
 
-    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1); it applies at the next start",
+    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1); it applies at the next start",
         Permission = CommandPermission.Admin, Node = ManageNode)]
     private string SetCommand(CommandContext c, string setting, int value)
     {
@@ -113,7 +123,7 @@ public sealed partial class MoreFlameAltarsMod
         bool set;
         string error;
         _saving = true;
-        try { set = Cfg().TrySet(path, path == "beyondSixteen" ? value != 0 : value, out error); }
+        try { set = Cfg().TrySet(path, SettingIndex.IsSwitch(Array.IndexOf(SettingIndex.Paths, path)) ? value != 0 : value, out error); }
         finally { _saving = false; }
         if (!set)
         {
@@ -169,7 +179,7 @@ public sealed partial class MoreFlameAltarsMod
         var saved = Saved(cfg);
         var hooked = AltarLimitHook.Installed;
         if (hooked)  // the altar settings apply at once through the hook: the saved ones are the running ones
-            foreach (var i in new[] { SettingIndex.Altars, SettingIndex.ExtraAltars, SettingIndex.BeyondSixteen }) running[i] = saved[i];
+            foreach (var i in new[] { SettingIndex.Altars, SettingIndex.ExtraAltars, SettingIndex.BeyondSixteen, SettingIndex.MergeBases }) running[i] = saved[i];
         var flame = WorldProgress.Available ? WorldProgress.Flame : null;
         var max = flame?.Max ?? 20;
         var altarsBy = new List<byte>();
@@ -218,7 +228,7 @@ public sealed partial class MoreFlameAltarsMod
             for (var i = 0; i < SettingIndex.Count; i++)
             {
                 var value = file.RootElement.GetProperty(SettingIndex.Paths[i]);
-                if ((i == SettingIndex.BeyondSixteen ? (value.GetBoolean() ? 1 : 0) : value.GetInt32()) != saved[i])
+                if ((SettingIndex.IsSwitch(i) ? (value.GetBoolean() ? 1 : 0) : value.GetInt32()) != saved[i])
                     throw new InvalidDataException("The file does not contain the requested settings.");
             }
             error = "";
@@ -293,7 +303,7 @@ public sealed partial class MoreFlameAltarsMod
         try
         {
             for (var i = 0; i < paths.Length; i++)
-                if (!cfg.TrySet(paths[i], i == SettingIndex.BeyondSixteen ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
+                if (!cfg.TrySet(paths[i], SettingIndex.IsSwitch(i) ? values[i] != 0 : values[i], out var error)) errors.Add($"{paths[i]}: {error}");
         }
         finally { _saving = false; }
         var applied = ApplyNow(); // earlier entries may have succeeded even if a later write failed

@@ -1,13 +1,61 @@
 {
   "format": 1,
   "side": "server",
-  "comment": "More Flame Altars' own symbol, loaded only when altars above 16 are switched on (Symbols.LoadShipped). AltarLimit is the game's altar-limit function: min(BalancingTable.altarsPerFlameLevel[flameLevel], 16), BalancingRegistry* in rcx, the Flame level in edx, the limit as a zero-extended u32 in eax (server 0x93dea0 / client 0xe96c80 on builds 26430253 / 26430625; identical bytes on both sides). altars.table is the table's offset of altarsPerFlameLevel (0x1b8).",
+  "comment": "More Flame Altars' own symbols, loaded when altars above 16 are switched on (Symbols.LoadShipped). AltarLimit is the game's altar-limit function: min(BalancingTable.altarsPerFlameLevel[flameLevel], 16), BalancingRegistry* in rcx, the Flame level in edx, the limit as a zero-extended u32 in eax (server 0x93dea0 / client 0xe96c80 on builds 26430253 / 26430625; identical bytes on both sides). altars.table is the table's offset of altarsPerFlameLevel (0x1b8). The Bases* symbols are PlayerBasesSystem functions for mergeBases (BaseMergeHook.cs), identical bytes on both sides: Rebuild(system, world) server 0x206510 / client 0x46dda0, Add(system, zone, index) 0x2072e0 / 0x46eb30, Contains(system, base, point) 0x2063a0 / 0x46dc30, Region(result, system, point) 0x208c60 / 0x470410, Point(result, system, point) 0x208fe0 / 0x470790, Water(result, boxes, system, point) 0x2083a0 / 0x46fbf0.",
   "symbols": {
     "more-flame-altars/AltarLimit": {
       "find": [
-        { "pattern": "48 8B 41 20 48 85 C0 75 06 B8 01 00 00 00 C3 48 05 {more-flame-altars/altars.table:d32} 48 63 08 85 C9 75 13 33 C9 8B C2 0F B6 04 08 B9 10 00 00 00 3A C1 0F 47 C1 C3" }
+        {
+          "pattern": "48 8B 41 20 48 85 C0 75 06 B8 01 00 00 00 C3 48 05 {more-flame-altars/altars.table:d32} 48 63 08 85 C9 75 13 33 C9 8B C2 0F B6 04 08 B9 10 00 00 00 3A C1 0F 47 C1 C3"
+        }
+      ]
+    },
+    "more-flame-altars/BasesRebuild": {
+      "find": [
+        {
+          "pattern": "48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 55 41 56 41 57 48 83 EC 50 45 33 E4 4C 8B F2 4C 8B E9 41 8B EC 44 39 61 24"
+        }
+      ]
+    },
+    "more-flame-altars/BasesAdd": {
+      "find": [
+        {
+          "pattern": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 56 41 57 48 83 EC 20 44 8B 49 24 48 8B F1 49 69 D9 30 01 00 00 41 8D 41 01"
+        }
+      ]
+    },
+    "more-flame-altars/BasesContains": {
+      "find": [
+        {
+          "pattern": "48 83 EC 18 F2 41 0F 10 18 4D 8B D0 F3 41 0F 10 50 08 0F 28 CB 48 69 C2 30 01 00 00 0F C6 C9 55 F2 0F 11 1C 24 4C 8B C9 0F 2F 9C 08 20 01 00 00"
+        }
+      ]
+    },
+    "more-flame-altars/BasesRegion": {
+      "find": [
+        {
+          "pattern": "48 89 5C 24 08 57 48 83 EC 10 8B 7A 24 45 33 DB 48 8B DA 4C 8B D1 48 85 FF 0F 84 ?? ?? ?? ?? F2 41 0F 10 00 41 8B 40 08 4C 8D 82 24 01 00 00"
+        }
+      ]
+    },
+    "more-flame-altars/BasesPoint": {
+      "find": [
+        {
+          "pattern": "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 8B 72 24 33 DB 4D 8B D8 48 8B FA 4C 8B D1 48 85 F6 0F 84 ?? ?? ?? ?? 4C 8D 8A 20 01 00 00"
+        }
+      ]
+    },
+    "more-flame-altars/BasesWater": {
+      "find": [
+        {
+          "pattern": "40 55 57 41 56 48 83 EC 40 F2 41 0F 10 01 49 8B E8 41 8B 41 08 4C 8D 44 24 20 48 8B FA F2 0F 11 44 24 20 4C 8B F1 89 44 24 28 48 8B D5 48 8D 4C 24 30 E8 ?? ?? ?? ?? 0F B6 44 24 30"
+        }
       ]
     }
   },
-  "constants": { "more-flame-altars/altars.table": { "min_votes": 1 } }
+  "constants": {
+    "more-flame-altars/altars.table": {
+      "min_votes": 1
+    }
+  }
 }

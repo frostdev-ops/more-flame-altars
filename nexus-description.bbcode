@@ -10,7 +10,7 @@
 [size=3][color=#D4D4D8]Enshrouded ties the number of Flame Altars (bases) to your world's Flame level: a new world allows 2, and you only reach 16 at Flame level 11. [b]More Flame Altars[/b] allows 16 from the very first Flame level, so you can settle every spot you like from the start. Or keep the game's progression and add a few on top.[/color][/size]
 
 [list]
-[*][size=3][color=#D4D4D8][b]Altars:[/b] at least 16 at every Flame level (default), or any number from 1 to 16[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Altars:[/b] at least 16 at every Flame level (default), or any number from 1 to 16, or up to 128 with the experimental beyondSixteen[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Extra altars:[/b] the game's own number plus a few at every level, for the game's progression with more room[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Water sources:[/b] optionally more water sources at every level, up to the game's own top of 50[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]/altars:[/b] type it in the chat for a window with your world's Flame level, the altars and water sources placed and allowed, and the numbers at every Flame level. Admins change the settings and the world's Flame level right there; everyone else can look[/color][/size][/*]
@@ -22,10 +22,14 @@
 The game           1   2   4   6   8  10  11  12  13  14  15  16
 More Flame Altars 16  16  16  16  16  16  16  16  16  16  16  16[/code]
 
-[quote][size=3][b][color=#F9C74F]Why not unlimited?[/color][/b]
-[color=#D4D4D8]The game is built for 16 bases. Its own code allows at most 16 Flame Altars, and the part of the game that runs bases (comfort, crafting from base chests, survivors' beds, animals, the journal's base list) has room for exactly 16. Tools that switch "unlimited altars" on give you altars that are bases in name only past the 16th, and one of them is reported to crash the game past 36.
+[quote][size=3][b][color=#F9C74F]More than 16? Up to 128, at your own risk[/color][/b]
+[color=#D4D4D8]The game is built for 16 bases: its own code allows at most 16 Flame Altars, and the part of the game that runs bases (comfort, crafting from base chests, survivors' beds, animals, the journal's base list) keeps 16 zones and 16 bases.
 
-So the mod stays at 16. For those who want more anyway, there is an [b]experimental[/b] switch, [b]beyondSixteen[/b] (off by default, admins only): up to 32 altars, where altars 17 and up only let you build. They get no comfort, no crafting from base chests, no survivor beds, no animals and no journal entry, and which altars those are can change after a reload.[/color][/size][/quote]
+The [b]experimental[/b] switch [b]beyondSixteen[/b] (off by default, admins only) lifts the limit up to [b]128[/b]. [b]It may crash your game.[/b] The mod does not stop you: if you want to try, it is your world and your call. Back up your save first, and every player needs the mod.
+
+With [b]mergeBases[/b] (on by default together with beyondSixteen), once your world has more than 16 altar zones, [b]all altars become one base[/b]: every altar gets comfort, base chests, survivor beds and the rest. The price: the journal lists one base, every base chest is shared by all altars, and comfort and beds are one base's. With mergeBases off, altars 17 and up only let you build (no comfort, base chests, beds, animals or journal entry). The merge technique is XHL's ("XHL-Unlimited-Flame-Altars", MIT); our code is our own.
+
+Known risks: nobody has tested more than 16 altars with this version in a real game yet; other mods' "unlimited altars" are reported to crash the game past about 36 altars, for reasons never pinned down; past about 43 zones the game's zone message to players gets big, and a player may miss zone updates; a player's game draws at most 32 zone borders at once.[/color][/size][/quote]
 [line]
 [size=5][b][color=#FF6A1A]Installation instructions[/color][/b][/size]
 [size=3][color=#D4D4D8]This mod needs [url=https://www.nexusmods.com/enshrouded/mods/301][color=#F9C74F]Kiln[/color][/url] [b]0.2.0-dev.28 or later[/b], on the server and on every player's game: the game reads these numbers on both sides.[/color][/size]
@@ -47,7 +51,8 @@ So the mod stays at 16. For those who want more anyway, there is an [b]experimen
 [*][size=3][color=#D4D4D8][b]extraAltars[/b] (0): added to the game's own number at every level[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]waterSources[/b] (0): at least this many water sources at every level; 0 leaves the game's numbers[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]extraWaterSources[/b] (0): added to the game's own number of water sources[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]beyondSixteen[/b] (off): experimental, more than 16 altars, see above[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]beyondSixteen[/b] (off): experimental, more than 16 altars (up to 128), may crash your game, see above[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]mergeBases[/b] (on, only with beyondSixteen): past 16 altar zones, all altars are one base, see above[/color][/size][/*]
 [/list]
 [size=3][color=#D4D4D8]Admins can also use [b]/altars set <setting> <value>[/b] and [b]/altars flame <level>[/b] in the chat or from the server console.[/color][/size]
 [line]
@@ -56,7 +61,8 @@ So the mod stays at 16. For those who want more anyway, there is an [b]experimen
 [list]
 [*][size=3][color=#D4D4D8][b]The limit patch does not rewrite the game's files or your save.[/b] Kiln changes the numbers each time the game starts, before the game reads them. Remove the mod and the next start has the game's numbers again. Altars you already placed should stay; you just cannot place new ones until your Flame level allows it. Changing the world's Flame level through /altars changes world progress and is saved by the game.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Every player needs the mod.[/b] A game without it shows and enforces the game's own numbers on its side.[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]Do not combine it[/b] with another tool that changes the altar limit or rewrites the game's data files (the Embervale Toolkit's altar switch and its "Tweaks" tab, for example).[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Do not combine it[/b] with another tool that changes the altar limit, the game's bases or the game's data files (the Embervale Toolkit's altar switch and its "Tweaks" tab, or XHL's Unlimited Flame Altars, for example).[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Thanks to XHL[/b] for the technique behind mergeBases.[/color][/size][/*]
 [/list]
 [/quote]
 

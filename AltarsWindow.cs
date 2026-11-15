@@ -168,12 +168,23 @@ public sealed partial class MoreFlameAltarsMod
             ui.Slider("Altars added to the game's", ref edit[SettingIndex.ExtraAltars], 0, cap - 1);
             ui.Slider("At least this many water sources", ref edit[SettingIndex.WaterSources], 0, WaterCap);
             ui.Slider("Water sources added to the game's", ref edit[SettingIndex.ExtraWaterSources], 0, WaterCap - 1);
-            if (ui.Checkbox($"Allow more than 16 altars, up to {AltarHardCap} (experimental)", ref beyond))
+            if (ui.Checkbox($"Allow more than 16 altars, up to {AltarHardCap} (experimental, may crash the game)", ref beyond))
                 edit[SettingIndex.BeyondSixteen] = beyond ? 1 : 0;
             if (beyond)
-                ui.TextWrapped("The game keeps track of 16 bases. Altars 17 and up only let you build: no comfort, no crafting " +
-                               "from base chests, no survivor beds, no animals, no journal entry, and which altars those are " +
-                               "can change after a reload. Every player needs the mod.");
+            {
+                ui.Text(Color.Orange, "Experimental: may crash your game.");
+                ui.TextWrapped("The game is built for 16 bases. Past 16 nobody has tested it in a real game with this " +
+                               "mod, and other mods' \"unlimited altars\" are reported to crash the game past about 36. Back up " +
+                               "your save first. Every player needs the mod.");
+                var merge = edit[SettingIndex.MergeBases] != 0;
+                if (ui.Checkbox("Past 16 altar zones, make all altars one base (XHL's technique)", ref merge))
+                    edit[SettingIndex.MergeBases] = merge ? 1 : 0;
+                ui.TextWrapped(merge
+                    ? "With more than 16 altar zones every altar is part of ONE base: comfort, base chests, beds and the rest work " +
+                      "at every altar, but the journal lists one base and every base chest is shared by all altars."
+                    : "The game's 16 bases stay. Altars 17 and up only let you build: no comfort, no crafting from base chests, " +
+                      "no survivor beds, no animals, no journal entry, and which altars those are can change after a reload.");
+            }
             var preview = SettingIndex.From(edit);
             ui.TextWrapped("With these: " + Describe(preview) + ".");
             if (s.AltarsByLevel.Length == GameAltars.Length && s.FlameLevel >= 0 && s.FlameLevel < GameAltars.Length)

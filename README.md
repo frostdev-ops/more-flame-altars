@@ -4,7 +4,7 @@
 
 More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources too.
 
-> **Which version?** This README describes 0.2.0, which needs Kiln 0.2.0-dev.28 or later. Still on Kiln 0.2.0-dev.27?
+> **Which version?** This README describes 0.3.0, which needs Kiln 0.2.0-dev.28 or later. Still on Kiln 0.2.0-dev.27?
 > Use **0.1.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases): 16 Flame Altars at every
 > Flame level (see [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
 
@@ -51,37 +51,58 @@ off on game clients until they have passed their test in a real game (`mods.boot
 
 `kiln/config/more-flame-altars.json` (or the mod's settings in Kiln's in-game menu). The game's table is changed once,
 when the game or the server starts, so a change applies at the next start. With `beyondSixteen` on, a change to the
-Flame Altar settings (`altars`, `extraAltars`, `beyondSixteen`) applies at once instead, also when you switch
-`beyondSixteen` on: the mod's hook then answers the game's altar limit from the settings as they are saved. Water
-sources always wait for the next start.
+Flame Altar settings (`altars`, `extraAltars`, `beyondSixteen`, `mergeBases`) applies at once instead, also when you
+switch `beyondSixteen` on: the mod's hook then answers the game's altar limit from the settings as they are saved, and
+`mergeBases` takes effect at the game's next rebuild of its bases (the mod asks for one). Water sources always wait for
+the next start.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `altars` | 16 | At least this many Flame Altars at every Flame level (1 to 16). |
-| `extraAltars` | 0 | Added to the game's own number at every level, up to 16. |
+| `altars` | 16 | At least this many Flame Altars at every Flame level (1 to 16; up to 128 with `beyondSixteen`). |
+| `extraAltars` | 0 | Added to the game's own number at every level, up to 16 (127 with `beyondSixteen`). |
 | `waterSources` | 0 | At least this many water sources at every level (0 to 50; 0 leaves the game's numbers). |
 | `extraWaterSources` | 0 | Added to the game's own number of water sources at every level, up to 50. |
-| `beyondSixteen` | false | **Experimental.** Allows more than 16 Flame Altars (`altars` then goes up to 32, `extraAltars` to 31). See below. |
+| `beyondSixteen` | false | **Experimental, may crash your game.** Allows more than 16 Flame Altars, up to 128. See below. |
+| `mergeBases` | true | **Experimental**, only with `beyondSixteen`. With more than 16 altar zones in the world, all altars become one base, so altars past 16 are real base area. Off: altars past 16 are build-only. See below. |
 
 A level never gets less than the game gives it. With every setting at its lowest the mod changes nothing.
 
 ## More than 16 altars (experimental)
 
-The game is built for 16 bases. Its own code allows at most 16 Flame Altars whatever its table says, and the part of
-the game that runs bases (comfort, crafting from base chests, beds and homes for survivors, animals, the journal's base
-list) has room for exactly 16. With `beyondSixteen` on, the mod lifts the first limit through Kiln's hooks, up to 32:
+**This can crash your game. If you want to try anyway, it is your world and your call:** the mod lets you go up to 128
+and does not stop you below that. Back up your save first. Every player needs the mod (a Kiln client follows the
+server's limit and merge when it joins and when they change; a game without the mod stops at 16). It is off by default
+and only for admins to switch on.
 
-- altars 17 and up let you build, but they are not bases: no comfort, no crafting from base chests, no survivor beds, no
-  animals, no journal entry;
-- which altars those are follows the order the game lists them in, which can change after a reload: a base that worked
-  yesterday can lose those features and another gains them;
-- every player needs the mod (a Kiln client follows the server's limit when it joins and when it changes; a game
-  without the mod stops at 16);
-- it is off by default and only for admins to switch on.
+The game is built for 16 bases. Its own code allows at most 16 Flame Altars whatever its table says, and the part of the
+game that runs bases (comfort, crafting from base chests, beds and homes for survivors, animals, the journal's base
+list) keeps 16 zones and 16 bases. With `beyondSixteen` on, the mod lifts the first limit through Kiln's hooks, up to
+128. What happens past 16 depends on `mergeBases`:
 
-This is what other tools' "unlimited altars" switches do as well (one of them answers 255 at every Flame level and is
-reported to crash the game past 36). The cap of 32 stays below that. Altars that touch or overlap could one day count as
-one base ("extension altars"), which would allow more altars without more than 16 bases; that needs changes inside Kiln.
+- **`mergeBases` on (the default with `beyondSixteen`):** once the world has more than 16 altar zones, the mod gives the
+  game's base system room for all of them and makes **all altars one base**. Every altar is then base area: comfort,
+  crafting from base chests, survivor beds, animals and the rest work at all of them. The price: the journal lists one
+  base, every base chest is shared by all altars, and comfort, beds and the rest are one base's. With 16 zones or fewer
+  the game's own separate bases stay. The technique is XHL's (see Credits); the code is the mod's own.
+- **`mergeBases` off:** the game's 16 bases stay. Altars 17 and up let you build, but they are not bases: no comfort, no
+  crafting from base chests, no survivor beds, no animals, no journal entry; which altars those are follows the order
+  the game lists them in, which can change after a reload.
+
+Known risks, plainly:
+
+- Nobody has tested more than 16 altars with this mod in a real game yet (see What is checked). The merge changes the
+  game's base system in memory on the server and on every player's game; a mistake there can crash the game.
+- Other mods' "unlimited altars" switches are reported to crash the game past about 36 altars. The cause was never
+  pinned down. Static reading found no overflow in the game's zone code up to 255 zones, and the parts that iterate
+  altar entities (spawn points, map markers, fast travel) were not checked.
+- The game's zone list sent to players is a single network message; past about 43 zones the server logs that it is
+  big, and past the session's message limit (unknown) a player may miss zone updates.
+- A player's game draws at most 32 zone borders at once; past 32 in view some borders are not drawn.
+- With `mergeBases`, the zone list has room for every zone, and the game's own base rebuild then tries to make a base
+  record for each separate zone past 16, which has no room and would overwrite the zone list. The mod skips those
+  records; that check is tested on a lab server, the rest of a merged world is not.
+
+Altars that touch or overlap count as one base in the game already ("extension altars").
 
 50 water sources is the most the game's own table gives, so the mod stays at or below it.
 
@@ -91,10 +112,10 @@ Type `/altars` in the chat. With the mod in your game, a window opens: the world
 sources placed and allowed, the numbers at every Flame level, and the mod's settings. Admins (permission
 `more-flame-altars.manage`) can change the settings there (see [Settings](#settings) for when they apply: the altars
 at once with `beyondSixteen` on, otherwise at the next start of the server, or of your game when you host) and set the
-world's Flame level. The window also has the `beyondSixteen` switch, with its warning. Everyone else sees the same window, read only.
+world's Flame level. The window also has the `beyondSixteen` and `mergeBases` switches, with their warnings. Everyone else sees the same window, read only.
 
-Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen> <value>`
-(use 0 or 1 for `beyondSixteen`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
+Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen|mergeBases> <value>`
+(use 0 or 1 for `beyondSixteen` and `mergeBases`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
 as the window. From the console, `/altars` prints a one-line summary.
 
 ## How it works
@@ -107,30 +128,49 @@ world's Flame level through `/altars` does change world progress and is saved by
 
 ## What is checked
 
-On a lab server (Kiln 0.2.0-dev.28, server build 26430253, no player), by the lab test in `tests/LabTest`:
+0.3.0, on a lab server (Kiln 0.2.0-dev.28 as released, runtime 0.2.0-dev.28+20261114.2301cc5, server build 26430253, no
+player), by the lab test in `tests/LabTest`, with four settings: `altars: 128` with `beyondSixteen` and `mergeBases`;
+the defaults with `beyondSixteen` off; `altars: 24` with `beyondSixteen` and `mergeBases` off; `altars: 1`,
+`extraAltars: 2` with both on:
 
-- the default (16 altars at every level), `altars: 12`, `extraAltars: 2` with `extraWaterSources: 5`, and 16 altars with
-  50 water sources: the running game's table holds exactly the expected numbers at all 21 Flame levels, and Kiln's
-  `WorldProgress.LimitsAt` reports them;
-- settings that change nothing stage nothing.
-- with `beyondSixteen` on, the game's own altar-limit function (called with a made-up table) answers up to 32 through
-  the mod's hook, and 16 with it off;
-- switching `beyondSixteen` on and `altars` to 24 from the server console while the server runs puts the hook in at
-  once, and the function then answers the new numbers, with no restart.
+- the running game's table holds exactly the expected numbers at all 21 Flame levels (128 at every level with
+  `altars: 128`), and Kiln's `WorldProgress.LimitsAt` reports them; settings that change nothing stage nothing;
+- the game's own altar-limit function, called with a made-up table, answers what the settings say through the mod's
+  hook: 128 at every Flame level with `altars: 128`, and the game's min(value, 16) with `beyondSixteen` off;
+- `mergeBases`: the game's own base rebuild, run on the server's real base system with a made-up world of separate
+  altar zones: with 20 zones, the game tries to make 20 base records and the mod skips the 4 past 16; with 20 and with 40
+  zones every zone is in the base system's list and they are one base; the game's own queries put a point in the 40th
+  zone in base 0 and a point between zones in no base; with the merge off, the same world gives the game's 16 zones and
+  16 bases, and the 40th zone is in no base.
 
-The client exe (build 26430625) has one copy of that function; its 11 callers are the build cursor, the hosted world's
-placement checks and the numbers in the game's UI, so the hook covers a world you host too (a static read, not a test).
+Offline (`tests/Offline`): the settings accept and save 128 and refuse 129, and the message that tells players the
+server's limits carries the server's merge switch. Statically, for the client exe (build 26430625): every function the mod hooks has the same bytes as on the
+server, and the patterns match exactly once in both exes.
 
-In a real game (a world hosted from the game, Kiln 0.2.0-dev.28 test build, with the `"preview"` line above): placing
-more Flame Altars than the game's number for the world's Flame level, past 16 with `beyondSixteen` too, and the
-`/altars` window.
+0.2.0 was checked in a real game (a world hosted from the game, Kiln 0.2.0-dev.28 test build, with the `"preview"`
+line above): placing more Flame Altars than the game's number for the world's Flame level, past 16 with `beyondSixteen`
+too (then capped at 32), and the `/altars` window.
 
-Not checked yet, because it needs more players:
+**Not checked yet:**
 
-- placing more water sources than the game's number;
-- a joining player with and without the mod;
-- removing the mod from a world that has more altars than the game's number allows (the altars should stay, and no new
-  one can be placed until the Flame level allows it).
+- anything of 0.3.0 in a player's game: the client side of the merge (a player's base system and base UI lists), the
+  raised limit past 32, and a client following the server's merge when it joins;
+- placing more than 16 altars in a real game with 0.3.0, with `mergeBases` on or off, and past 32 or 36 altars: whether
+  the merged base's comfort, base chests, survivors and the journal behave, and whether the game crashes;
+- placing more water sources than the game's number; a joining player with and without the mod; removing the mod from
+  a world that has more altars than the game's number allows (the altars should stay, and no new one can be placed
+  until the Flame level allows it).
+
+## Changes
+
+- **0.3.0** (Kiln 0.2.0-dev.28): up to 128 Flame Altars with `beyondSixteen` (was 32). New `mergeBases` (on by default
+  when `beyondSixteen` is on): past 16 altar zones all altars become one base, so altars past 16 are real base area
+  (XHL's technique, our code). The mod also stops the game's base rebuild from writing a 17th base record over its zone
+  list. The window and `/altars set` have the new switch; the risks are stated in the window, here and on the mod page.
+  Players need 0.3.0 too (the window's channel is version 3). Supersedes 0.2.0, which was never released on its own.
+- **0.2.0** (Kiln 0.2.0-dev.28): the C# version: settings, water sources, `/altars` window and commands, the
+  experimental `beyondSixteen` (up to 32, build-only past 16).
+- **0.1.0** (Kiln 0.2.0-dev.27): the start-up data version in `eml/`, 16 altars at every level.
 
 ## 0.1.0, for Kiln 0.2.0-dev.27
 
@@ -164,6 +204,12 @@ kiln run --server "$lab" --wait 300 && kiln test more-flame-altars-labtest --ser
 
 `art/` holds the banners and thumbnails (`art/compose.py` rebuilds them from `art/source/`, made with an image
 generator; `art/source/generation_prompts.json` has the prompts).
+
+## Credits
+
+`mergeBases` uses the technique of XHL's "XHL-Unlimited-Flame-Altars" 2.1.0 (MIT): a larger zone list for the game's
+base system, all zones as one base, and the game's base queries answered from the zone list. We read XHL's mod
+statically to learn it; More Flame Altars ships none of its code. Thank you, XHL.
 
 ## License
 

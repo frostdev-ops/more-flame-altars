@@ -1,32 +1,36 @@
 // SPDX-License-Identifier: MIT
 // Altars above 16 (experimental, off by default). The game's limit function (sigdb/<side>.json: AltarLimit) answers
 // min(altarsPerFlameLevel[flameLevel], 16) to every check that limits Flame Altars: on the client exe (build 26430625) its
-// 11 callers are the build cursor (0x29aebc), the hosted world's placement checks (0x2d4d96, 0x2da6b5) and the UI's
-// numbers, so one detour covers a world a player hosts too. With the hook in, the mod answers from its settings as they
-// are saved now, so a change made in /altars applies at once: the game's own number for the level (the mod's list of
-// them), raised by the rule, at most 32. A joined Kiln client answers with the server's numbers, which the server sends
-// when it joins and after a change (AltarsLimits), so both sides agree.
+// 11 callers are the build cursor (0x29aebc), the hosted world's placement checks (0x2d4d96, 0x2da6b5; XHL's mod calls the
+// first one and the server's 0xc0d36 "Reclaim"), a check at 0xb482bb (XHL: "reactivate") and the UI's numbers. One detour
+// covers a world a player hosts too. With the hook in, the mod answers from its settings as they are saved now, so a
+// change made in /altars applies at once: the game's own number for the level (the mod's list of them), raised by the
+// rule, at most 128. A joined Kiln client answers with the server's numbers, which the server sends when it joins and after a change
+// (AltarsLimits), so both sides agree.
 //
-// What it does not change: the game's base system tracks 16 build zones and 16 bases. Altars 17 and up are build-only
-// (no comfort, base chests, survivor beds, animals, journal entry), and which altars those are can change after a
-// reload (README.md, "More than 16 altars").
+// What it does not change: the game's base system tracks 16 build zones and 16 bases. Without mergeBases (BaseMergeHook.cs)
+// altars 17 and up are build-only (no comfort, base chests, survivor beds, animals, journal entry), and which altars those
+// are can change after a reload (README.md, "More than 16 altars").
 using Kiln;
 
 namespace MoreFlameAltars;
 
 /// <summary>Server to client, when a Kiln client with the mod joins and after a settings change: the altar limit at each
-/// Flame level as the server answers it (above 16 only with beyondSixteen on the server).</summary>
-public sealed record AltarsLimits(bool Beyond, byte[] ByLevel) : INetMessage<AltarsLimits>
+/// Flame level as the server answers it (above 16 only with beyondSixteen on the server), and whether the server merges
+/// its bases past 16 zones (mergeBases), which the client then does too.</summary>
+public sealed record AltarsLimits(bool Beyond, byte[] ByLevel, bool Merge = false) : INetMessage<AltarsLimits>
 {
-    public void Encode(NetWriter w) => w.Bool(Beyond).Bytes(ByLevel);
+    public void Encode(NetWriter w) => w.Bool(Beyond).Bytes(ByLevel).Bool(Merge);
     public static AltarsLimits Decode(ref NetReader r)
     {
         var beyond = r.Bool();
         var by = r.Bytes(64);
+        var merge = r.Bool();
         var cap = beyond ? MoreFlameAltarsMod.AltarHardCap : MoreFlameAltarsMod.AltarCap;
         if (by.Length == 0 || by.Any(v => v < 1 || v > cap))
             throw new NetFormatException("Invalid server altar limits.");
-        return new(beyond, by);
+        if (merge && !beyond) throw new NetFormatException("Merged bases need altars above 16.");
+        return new(beyond, by, merge);
     }
 }
 
@@ -66,8 +70,8 @@ internal static class AltarLimitHook
         try
         {
             if (!Hooks.Available) { why = "Kiln's hooks are not available on this game build"; return false; }
-            var s = Symbols.LoadShipped();
-            if (s.SymbolsOk < 1) { why = "the game's altar-limit function was not found on this game build"; return false; }
+            GameSymbols.Load();
+            if (!Symbols.TryGet(Symbol, out _)) { why = "the game's altar-limit function was not found on this game build"; return false; }
             if (Constants.Get("more-flame-altars/altars.table") != TableOffset)
             {
                 why = "the altar table moved on this game build";

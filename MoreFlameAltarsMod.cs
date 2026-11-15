@@ -9,22 +9,29 @@ public sealed class Settings
 {
     [Comment("Flame Altars a world may have at every Flame level: at least this many. The game's own numbers grow with the " +
              "Flame level: 1, 2, 4, 6, 8, 10, 11, 12, 13, 14, 15, then 16 from Flame level 11 on. A level where the game " +
-             "already allows more keeps the game's number. At most 16, or 32 with beyondSixteen."),
-     Range(1, 32), RequiresRestart]
+             "already allows more keeps the game's number. At most 16, or 128 with beyondSixteen."),
+     Range(1, 128), RequiresRestart]
     public int Altars { get; set; } = 16;
 
-    [Comment("Flame Altars added to the game's own number at every Flame level, up to 16 (32 with beyondSixteen). With " +
+    [Comment("Flame Altars added to the game's own number at every Flame level, up to 16 (128 with beyondSixteen). With " +
              "Altars at 1 and this at 2, Flame level 0 allows 3, a new world (level 1) allows 4, level 2 allows 6: the game's progression " +
              "with a little more room. 0 adds none."),
-     Range(0, 31), RequiresRestart]
+     Range(0, 127), RequiresRestart]
     public int ExtraAltars { get; set; }
 
-    [Comment("EXPERIMENTAL. Allow more than 16 Flame Altars (up to 32). The game's base system keeps track of 16 bases: " +
-             "altars 17 and up only let you build. They get no comfort, no crafting from base chests, no survivor beds, no " +
-             "animals and no journal entry, and which altars those are can change after a reload. Every player needs the " +
-             "mod. Leave it off unless you want build-only altars."),
+    [Comment("EXPERIMENTAL, may crash your game. Allow more than 16 Flame Altars (up to 128). The game is built for 16 " +
+             "bases; past 16 it was never tested by its makers, and reports say other mods' 'unlimited altars' crash it " +
+             "past about 36. With mergeBases off, altars 17 and up only let you build (no comfort, base chests, survivor " +
+             "beds, animals, journal entry). Every player needs the mod. Your world, your call."),
      RequiresRestart]
     public bool BeyondSixteen { get; set; }
+
+    [Comment("EXPERIMENTAL, with beyondSixteen. When the world has more than 16 altar zones, the mod makes all altars " +
+             "ONE base (XHL's technique), so altars past 16 get comfort, base chests and the rest too. The price: one " +
+             "base in the journal, every base chest shared by all altars, one base's comfort and beds. Off: the game's 16 " +
+             "bases, altars past 16 build-only. Not tested in a real game yet."),
+     RequiresRestart]
+    public bool MergeBases { get; set; } = true;
 
     [Comment("Water sources a world may have at every Flame level: at least this many. The game's own numbers: 1 up to " +
              "Flame level 3, then 5, 10, 20, 30, 40, and 50 from Flame level 9 on. 0 leaves the game's numbers."),
@@ -47,7 +54,7 @@ public sealed partial class MoreFlameAltarsMod : Mod
     /// <summary>The highest number the game's own lists hold: the game's code caps altars at 16, and 50 water sources is
     /// the most its table gives. The mod never goes past either, except altars with beyondSixteen (up to
     /// <see cref="AltarHardCap"/>, see AltarLimitHook.cs).</summary>
-    internal const int AltarCap = 16, WaterCap = 50, AltarHardCap = 32;
+    internal const int AltarCap = 16, WaterCap = 50, AltarHardCap = 128;
 
     internal static int CapOf(Settings s) => s.BeyondSixteen ? AltarHardCap : AltarCap;
 
@@ -74,9 +81,19 @@ public sealed partial class MoreFlameAltarsMod : Mod
         if (Cfg().Value.BeyondSixteen)
         {
             if (AltarLimitHook.Install(HookRules(), out var why))
-                Log.Info($"More Flame Altars: altars above 16 are on (up to {AltarHardCap}, experimental): altars 17 and up are build-only");
+                Log.Info($"More Flame Altars: altars above 16 are on (up to {AltarHardCap}, experimental)" +
+                         (Cfg().Value.MergeBases ? "" : ": altars 17 and up are build-only"));
             else
                 Log.Warn($"More Flame Altars: altars above 16 could not be switched on ({why}); the game's limit of 16 stays");
+        }
+        _mergeWanted = Cfg().Value.BeyondSixteen && Cfg().Value.MergeBases;
+        if (_mergeWanted)
+        {
+            if (BaseMergeHook.Install(out var why))
+                Log.Info("More Flame Altars: more than 16 altar zones become one base (mergeBases, experimental)");
+            else
+                Log.Warn($"More Flame Altars: mergeBases could not be switched on ({why}); altars 17 and up stay build-only");
+            BaseMergeHook.SetEnabled(BaseMergeHook.Installed && Client.IsDedicatedServer);
         }
         if (Patch(Cfg().Value) is null) return;  // OnBoot said so
         var state = Mods.BootState(Context.Info.Id);
@@ -106,6 +123,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
         var now = Environment.TickCount64;
         if (_saving || now < _nextSettingsCheck || !IsServerSide) return;
         _nextSettingsCheck = now + 1000;
+        // a server, or a game that hosts its world, merges by its own settings (a joined game: by the server's, OnLimits)
+        BaseMergeHook.SetEnabled(BaseMergeHook.Installed && _mergeWanted);
         if (_observedSettings is { } old && old.SequenceEqual(Saved(Cfg()))) return;
         ApplyNow();
     }
@@ -124,15 +143,43 @@ public sealed partial class MoreFlameAltarsMod : Mod
         string? failed = null;
         // a failure is in the text, which the window's request and /altars set log and answer
         if (!AltarLimitHook.Installed && saved.BeyondSixteen && !AltarLimitHook.Install(HookRules(), out var why)) failed = why;
+        var merge = ApplyMerge(saved.BeyondSixteen && saved.MergeBases);
         if (!AltarLimitHook.Installed)
-            return failed is null ? AppliesWhen() : $"Altars above 16 could not be switched on now ({failed}). {AppliesWhen()}";
+            return (failed is null ? AppliesWhen() : $"Altars above 16 could not be switched on now ({failed}). {AppliesWhen()}") + merge;
         AltarLimitHook.SetRules(HookRules());
         var limits = LimitsMessage();
         var sent = limits.ByLevel.Length > 0 ? _ch?.SendToAll(limits) ?? 0 : 0;
-        var altarsOnly = new Settings { Altars = saved.Altars, ExtraAltars = saved.ExtraAltars, BeyondSixteen = saved.BeyondSixteen };
+        var altarsOnly = new Settings
+        {
+            Altars = saved.Altars, ExtraAltars = saved.ExtraAltars, BeyondSixteen = saved.BeyondSixteen, MergeBases = saved.MergeBases,
+        };
         Log.Info($"More Flame Altars: the Flame Altar limit now: {Describe(altarsOnly)}" + (sent > 0 ? $"; sent to {sent} player(s)" : ""));
-        return "The Flame Altar limit applies now." + (waterLater ? " Water sources: " + AppliesWhen() : "");
+        return "The Flame Altar limit applies now." + (waterLater ? " Water sources: " + AppliesWhen() : "") + merge;
     }
+
+    /// <summary>Whether this server (or hosted world) merges bases past 16 zones: the saved settings' wish, set on the
+    /// tick thread (CheckSettings applies it once a second).</summary>
+    private static volatile bool _mergeWanted;
+
+    /// <summary>Server side: mergeBases as saved, now. Installs the hooks the first time. A sentence for the answer when
+    /// something is worth saying.</summary>
+    private static string ApplyMerge(bool wanted)
+    {
+        _mergeWanted = wanted;
+        if (!wanted)
+        {
+            var was = BaseMergeHook.Enabled;
+            BaseMergeHook.SetEnabled(false);
+            return was ? " Bases are no longer merged: the game's 16 bases return at its next rebuild of them." : "";
+        }
+        if (!BaseMergeHook.Installed && !BaseMergeHook.Install(out var why))
+            return $" mergeBases could not be switched on ({why}): altars 17 and up stay build-only.";
+        var on = !BaseMergeHook.Enabled;
+        BaseMergeHook.SetEnabled(true);
+        return on ? " With more than 16 altar zones, all altars are one base from the game's next rebuild of its bases." : "";
+    }
+
+    public override void OnUnload() => BaseMergeHook.Release();
 
     /// <summary>The boot patch for these settings, or null when they leave every number as the game has it.</summary>
     internal static ResourcePatchBlock? Patch(Settings s)
@@ -163,7 +210,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
     {
         var parts = new List<string>();
         if (Raise(s.Altars, s.ExtraAltars, CapOf(s)) is not null)
-            parts.Add(Words("Flame Altars", s.Altars, s.ExtraAltars, CapOf(s)) + (s.BeyondSixteen ? " (above 16: build-only, experimental)" : ""));
+            parts.Add(Words("Flame Altars", s.Altars, s.ExtraAltars, CapOf(s)) +
+                      (!s.BeyondSixteen ? "" : s.MergeBases ? " (above 16: one merged base, experimental)" : " (above 16: build-only, experimental)"));
         if (Raise(s.WaterSources, s.ExtraWaterSources, WaterCap) is not null)
             parts.Add(Words("water sources", s.WaterSources, s.ExtraWaterSources, WaterCap));
         return string.Join("; ", parts);
