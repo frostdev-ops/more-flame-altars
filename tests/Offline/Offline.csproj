@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../MoreFlameAltars.csproj" />
-    <PackageReference Include="Kiln.Api" Version="0.2.0-dev.28" GeneratePathProperty="true" />
+    <PackageReference Include="Kiln.Api" Version="0.2.0-dev.29.18" GeneratePathProperty="true" />
     <!-- The mod excludes runtime copies; this offline executable needs the managed services beside it. -->
     <Reference Include="$(PkgKiln_Api)/kiln/lib/*.dll" />
   </ItemGroup>

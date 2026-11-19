@@ -11,7 +11,8 @@ namespace MoreFlameAltars.LabTest;
 
 public sealed class LabTestMod : Mod
 {
-    public override void OnLoad() { }
+    internal static Logger? Logger;
+    public override void OnLoad() => Logger = Log;
 }
 
 public sealed class Tests
