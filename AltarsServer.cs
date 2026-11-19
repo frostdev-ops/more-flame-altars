@@ -19,7 +19,7 @@ public sealed partial class MoreFlameAltarsMod
     private void OpenChannel()
     {
         Permissions.Register(ManageNode, PermissionLevel.Admin, "change More Flame Altars' settings and the world's Flame level");
-        _ch = Network.Channel(Channel, "3")
+        _ch = Network.Channel(Channel, "4")
             .Register<AltarsState>((m, _) => OnState(m), NetDirection.ToClient)
             .Register<AltarsRequest>((m, ctx) => OnRequest(m, ctx.Player), NetDirection.ToServer)
             .Register<AltarsResult>((m, _) => OnResult(m), NetDirection.ToClient)
@@ -103,7 +103,7 @@ public sealed partial class MoreFlameAltarsMod
         return Summary() + (c.Source.IsPlayer ? " (the window needs More Flame Altars in your game)" : "");
     }
 
-    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1); it applies at the next start",
+    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1, buildArea 100-200); most apply at the next start",
         Permission = CommandPermission.Admin, Node = ManageNode)]
     private string SetCommand(CommandContext c, string setting, int value)
     {
@@ -179,7 +179,7 @@ public sealed partial class MoreFlameAltarsMod
         var saved = Saved(cfg);
         var hooked = AltarLimitHook.Installed;
         if (hooked)  // the altar settings apply at once through the hook: the saved ones are the running ones
-            foreach (var i in new[] { SettingIndex.Altars, SettingIndex.ExtraAltars, SettingIndex.BeyondSixteen, SettingIndex.MergeBases }) running[i] = saved[i];
+            foreach (var i in SettingIndex.AltarSettings) running[i] = saved[i];
         var flame = WorldProgress.Available ? WorldProgress.Flame : null;
         var max = flame?.Max ?? 20;
         var altarsBy = new List<byte>();
@@ -197,7 +197,26 @@ public sealed partial class MoreFlameAltarsMod
             flame?.Level ?? -1, max, flame?.Altars ?? -1,
             allowed is null ? -1 : hooked ? AltarLimitHook.Answer((uint)flame!.Level, allowed.Altars) : Math.Min(allowed.Altars, AltarCap),
             flame?.WaterSources ?? -1, allowed?.WaterSources ?? -1,
-            running, saved, altarsBy.ToArray(), waterBy.ToArray());
+            running, saved, altarsBy.ToArray(), waterBy.ToArray(), AreaNow());
+    }
+
+    /// <summary>One side of the build area at altar level 1 and up, in whole metres, as this game's table holds it now
+    /// (x; the mod scales the three sides alike). Empty when the table cannot be read.</summary>
+    private static int[] AreaNow()
+    {
+        try
+        {
+            if (!Assets.Available || Assets.Reflect(new AssetKey(BalancingTableId, "keen::BalancingTable")) is not { } table) return [];
+            var n = Math.Min(table.Count("buildzoneSizesPerAltarLevel"), 16);
+            var by = new List<int>();
+            for (var level = 1; level < n; level++)
+                by.Add((int)Math.Round(Convert.ToDouble(table[$"buildzoneSizesPerAltarLevel[{level}].x"], System.Globalization.CultureInfo.InvariantCulture)));
+            return by.ToArray();
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The settings as the file holds them (an entry waiting for a restart keeps its file value there).</summary>

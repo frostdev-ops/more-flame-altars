@@ -2,15 +2,18 @@
 
 ![More Flame Altars](art/nexus_banner_1920x480.png)
 
-More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources too.
+More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources, and bigger
+build areas around every altar.
 
-> **Which version?** This README describes 0.3.0, which needs Kiln 0.2.0-dev.28 or later. Still on Kiln 0.2.0-dev.27?
-> Use **0.1.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases): 16 Flame Altars at every
-> Flame level (see [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
+> **Which version?** This README describes 0.4.0, which needs Kiln 0.2.0-dev.29.18 or later. On Kiln 0.2.0-dev.28 to
+> 0.2.0-dev.29.17, use **0.3.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases) (no build
+> area setting). Still on Kiln 0.2.0-dev.27? Use **0.1.0**: 16 Flame Altars at every Flame level (see
+> [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
 
 The game ties the number of Flame Altars to the world's Flame level: a new world allows 2, and the game only reaches 16
 at Flame level 11. By default this mod allows 16 at every level, so you can found all your bases from the start. Or keep
-the game's progression and add a few on top.
+the game's progression and add a few on top. With `buildArea`, every altar's build area can be up to twice as wide,
+deep and high as the game's.
 
 | Flame level | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 and up |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -23,14 +26,11 @@ the game's progression and add a few on top.
 
 ## Needs
 
-Kiln 0.2.0-dev.28 or later, on the server and on every player's game: the game reads these numbers on both sides, so a
-player without the mod would see and be held to the game's own numbers. Kiln's modpack hands the mod to players who
-join a Kiln server.
-
-Since Kiln 0.2.0-dev.29, a player's game loads start-up (boot) mods like this one with no setting: on a world you
-host and when you join a server that runs it. On Kiln 0.2.0-dev.28 players needed
-`"preview": ["mods.boot.client", "mods.boot.resource_patches"]` in `kiln/kiln.json`; on 0.2.0-dev.29 and later that
-line is no longer needed (leaving it does no harm). Update Kiln rather than adding it.
+Kiln 0.2.0-dev.29.18 or later (mod API 0.2.10), on the server and on every player's game: the game reads these numbers
+on both sides, so a player without the mod would see and be held to the game's own numbers. Kiln's modpack hands the
+mod to players who join a Kiln server, and a player's game loads it with no extra setting, on a world you host and when
+you join a server that runs it. (A `"preview"` line in `kiln/kiln.json` from Kiln 0.2.0-dev.28 is no longer needed;
+leaving it does no harm.)
 
 ## Install
 
@@ -43,8 +43,8 @@ line is no longer needed (leaving it does no harm). Update Kiln rather than addi
 when the game or the server starts, so a change applies at the next start. With `beyondSixteen` on, a change to the
 Flame Altar settings (`altars`, `extraAltars`, `beyondSixteen`, `mergeBases`) applies at once instead, also when you
 switch `beyondSixteen` on: the mod's hook then answers the game's altar limit from the settings as they are saved, and
-`mergeBases` takes effect at the game's next rebuild of its bases (the mod asks for one). Water sources always wait for
-the next start.
+`mergeBases` takes effect at the game's next rebuild of its bases (the mod asks for one). Water sources and the build
+area always wait for the next start.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -54,8 +54,36 @@ the next start.
 | `extraWaterSources` | 0 | Added to the game's own number of water sources at every level, up to 50. |
 | `beyondSixteen` | false | **Experimental, may crash your game.** Allows more than 16 Flame Altars, up to 128. See below. |
 | `mergeBases` | true | **Experimental**, only with `beyondSixteen`. With more than 16 altar zones in the world, all altars become one base, so altars past 16 are real base area. Off: altars past 16 are build-only. See below. |
+| `buildArea` | 100 | Every Flame Altar's build area, in percent of the game's (100 to 200). 100 keeps the game's sizes. See [Bigger build areas](#bigger-build-areas). |
 
 A level never gets less than the game gives it. With every setting at its lowest the mod changes nothing.
+
+## Bigger build areas
+
+A Flame Altar's build area is a cube around it. Its size depends on the altar's level, not on the Flame level, and
+`buildArea` scales it on all three sides:
+
+| Altar level | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| One side, the game | 40 m | 80 m | 120 m | 160 m | 160 m |
+| One side, `buildArea: 150` | 60 m | 120 m | 180 m | 240 m | 240 m |
+| One side, `buildArea: 200` (the most) | 80 m | 160 m | 240 m | 320 m | 320 m |
+
+- **When it applies:** at the next start of the server (or of your game, when you host). From then on every altar has
+  the bigger area: new ones and the ones already placed (seen on the lab server with level-1 altars; every altar level
+  reads the same table).
+- **Why at most 200:** the game saves terrain only inside bases, so the save grows with the build area, and the area
+  grows with the cube of the setting: 200 is already eight times the game's volume per altar. On a lab server a world
+  of 11 level-1 altars saved 0.6 MB at 100; 17 of them saved 3.8 MB at 200, and 250 made the save about seven times the
+  game's size. Bigger areas also reach neighbouring altars sooner, and altars whose areas touch or overlap are one base
+  in the game.
+- **Lowering it again** (or removing the mod) shrinks every area at the next start. What lies outside the smaller area
+  is then no longer base terrain: the game stops saving it, and after the next save and restart the terrain there is
+  back to the world's own ground (seen on the lab server). Building blocks are terrain to the game, so **blocks you
+  placed outside the smaller area go too**; placed items such as furniture are saved anywhere. Lower it only when
+  nothing you built stands outside the smaller areas.
+- **Every player needs the mod with the same setting.** The setting changes the game's table on each side; a player's
+  game started with other settings warns in `/altars`.
 
 ## More than 16 altars (experimental)
 
@@ -99,24 +127,45 @@ Altars that touch or overlap count as one base in the game already ("extension a
 ## /altars
 
 Type `/altars` in the chat. With the mod in your game, a window opens: the world's Flame level, the altars and water
-sources placed and allowed, the numbers at every Flame level, and the mod's settings. Admins (permission
+sources placed and allowed, the build area, the numbers at every Flame level and altar level, and the mod's settings,
+each with when it applies. Admins (permission
 `more-flame-altars.manage`) can change the settings there (see [Settings](#settings) for when they apply: the altars
 at once with `beyondSixteen` on, otherwise at the next start of the server, or of your game when you host) and set the
 world's Flame level. The window also has the `beyondSixteen` and `mergeBases` switches, with their warnings. Everyone else sees the same window, read only.
 
-Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen|mergeBases> <value>`
-(use 0 or 1 for `beyondSixteen` and `mergeBases`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
+Admin commands, also from the server console: `/altars set <altars|extraAltars|waterSources|extraWaterSources|beyondSixteen|mergeBases|buildArea> <value>`
+(use 0 or 1 for `beyondSixteen` and `mergeBases`, 100 to 200 for `buildArea`) and `/altars flame <level>`. They use the same `more-flame-altars.manage` permission
 as the window. From the console, `/altars` prints a one-line summary.
 
 ## How it works
 
 The numbers are lists in the game's balancing table (`keen::BalancingTable`: `altarsPerFlameLevel` and
-`waterSourcesPerFlameLevel`, one number per Flame level). The game reads that table once, at its start, so the mod
+`waterSourcesPerFlameLevel`, one number per Flame level; `buildzoneSizesPerAltarLevel`, the build area's cube at each
+altar level). The game reads that table once, at its start, so the mod
 changes it in Kiln's boot phase (`Mod.OnBoot`, a resource patch), before the game reads it. The limit patch does not
 rewrite the game's files or your save: remove the mod and the next start has the game's numbers again. Changing the
 world's Flame level through `/altars` does change world progress and is saved by the game.
 
 ## What is checked
+
+0.4.0, on a lab server (Kiln 0.2.0-dev.29.18 as released, server build 26430253, no player), by the lab test in
+`tests/LabTest` over eleven starts of one world with `buildArea` 100, 200, 100, 250 and 200 in that order (one 250
+start with `beyondSixteen`; the last start ran the packed 0.4.0 zip):
+
+- the running game's table holds the game's sizes times the setting on all three sides at every altar level
+  (`[0, 80, 160, 240, 320, 320]` m at 200), and the server's zone of every altar equals its replicated range
+  (`TriggerShape`);
+- a new altar gets the bigger zone at once (level 1: half 40 m at 200, 50 m at 250), and the game's own zone test counts
+  a point 30 m from it as inside at 200 and a point past the border as outside;
+- altars placed at 100 have the bigger zone after the next start at 200, and the game's size again after a start at
+  100;
+- terrain built 30 m from a level-1 altar at 200 (with Kiln's own save region released, so only the game's save could
+  keep it) was still there after a restart at 200 and after the first start back at 100, and gone after the next one;
+- altars whose bigger zones overlap are one base in the game's base system (13 altar zones made 8 bases).
+
+The 0.3.0 checks below ran again in the starts with `beyondSixteen` off and passed. Offline (`tests/Offline`): the patch scales the three
+sides only above 100 and never past 200, goes into the same boot patch as the altars, and the settings refuse 99 and
+201 and settings from a 0.3.0 window.
 
 0.3.0, on a lab server (Kiln 0.2.0-dev.28 as released, runtime 0.2.0-dev.28+20261114.2301cc5, server build 26430253, no
 player), by the lab test in `tests/LabTest`, with four settings: `altars: 128` with `beyondSixteen` and `mergeBases`;
@@ -143,6 +192,8 @@ too (then capped at 32), and the `/altars` window.
 
 **Not checked yet:**
 
+- anything of `buildArea` in a player's game: whether the player's game draws the bigger border and lets them build
+  in it, and what a game without the mod (or with another setting) does at the old border;
 - anything of 0.3.0 in a player's game: the client side of the merge (a player's base system and base UI lists), the
   raised limit past 32, and a client following the server's merge when it joins;
 - placing more than 16 altars in a real game with 0.3.0, with `mergeBases` on or off, and past 32 or 36 altars: whether
@@ -153,6 +204,11 @@ too (then capped at 32), and the `/altars` window.
 
 ## Changes
 
+- **0.4.0** (Kiln 0.2.0-dev.29.18): new `buildArea`: bigger build areas around every Flame Altar, up to twice the
+  game's size on every side, in the same start-up patch as the altars. The `/altars` window is laid out again: one
+  section per setting with its value and when it applies, the build area at every altar level, a "not saved yet"
+  hint, and the switches under Experimental. `/altars set buildArea <100-200>`. Players need 0.4.0 too (the window's
+  channel is version 4).
 - **0.3.0** (Kiln 0.2.0-dev.28): up to 128 Flame Altars with `beyondSixteen` (was 32). New `mergeBases` (on by default
   when `beyondSixteen` is on): past 16 altar zones all altars become one base, so altars past 16 are real base area
   (XHL's technique, our code). The mod also stops the game's base rebuild from writing a 17th base record over its zone
@@ -181,11 +237,11 @@ To make its zip: `mkdir -p dist && (cd eml && zip -r ../dist/more-flame-altars-0
 ## Development
 
 ```sh
-ln -s ~/Kiln-release/kiln-0.2.0-dev.28/sdk kiln-sdk        # the SDK
+ln -s ~/Kiln-release/kiln-0.2.0-dev.29.18/sdk kiln-sdk     # the SDK (its .nupkg files)
 dotnet build -c Release -t:KilnPack -p:KilnPackageOutputPath=dist/
 # managed regression checks; no game server needed
 dotnet run --project tests/Offline -c Release
-# lab check (a lab made with Kiln's tools/lab/lab.sh, Kiln 0.2.0-dev.28 in it)
+# lab check (a lab made with Kiln's tools/lab/lab.sh, Kiln 0.2.0-dev.29.18 in it)
 lab=/path/to/lab
 dotnet build -c Release -t:KilnDeploy -p:KilnServer="$lab"
 (cd tests/LabTest && dotnet build -c Release -t:KilnDeploy -p:KilnServer="$lab")

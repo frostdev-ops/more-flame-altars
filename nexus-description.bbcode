@@ -1,7 +1,7 @@
 [center][size=5][b][color=#FF6A1A]More Flame Altars[/color][/b][/size]
-[size=3][color=#D4D4D8]Found every base from day one: 16 Flame Altars at every Flame level.[/color][/size]
+[size=3][color=#D4D4D8]Found every base from day one: 16 Flame Altars at every Flame level, and bigger build areas if you like.[/color][/size]
 
-[size=2][b][color=#F9C74F]NEEDS KILN 0.2.0-dev.28+[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]SERVER + EVERY PLAYER[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]MIT[/color][/b][/size][/center]
+[size=2][b][color=#F9C74F]NEEDS KILN 0.2.0-dev.29.18+[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]SERVER + EVERY PLAYER[/color]  [color=#71717A]◆[/color]  [color=#F9C74F]MIT[/color][/b][/size][/center]
 
 [center][url=https://discord.gg/7pjr8SMTfU][img]https://frostdev.io/kiln/discord-banner.png[/img][/url]
 [size=2][color=#A1A1AA]Questions, bug reports and ideas: the Kiln Discord.[/color][/size][/center]
@@ -13,7 +13,8 @@
 [*][size=3][color=#D4D4D8][b]Altars:[/b] at least 16 at every Flame level (default), or any number from 1 to 16, or up to 128 with the experimental beyondSixteen[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Extra altars:[/b] the game's own number plus a few at every level, for the game's progression with more room[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Water sources:[/b] optionally more water sources at every level, up to the game's own top of 50[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]/altars:[/b] type it in the chat for a window with your world's Flame level, the altars and water sources placed and allowed, and the numbers at every Flame level. Admins change the settings and the world's Flame level right there; everyone else can look[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Bigger build areas (new in 0.4.0):[/b] every Flame Altar's build area up to twice as wide, deep and high as the game's, for new altars and the ones you already placed[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]/altars:[/b] type it in the chat for a window with your world's Flame level, the altars and water sources placed and allowed, the build area, and the numbers at every level. Admins change the settings and the world's Flame level right there; everyone else can look[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Never less:[/b] a level never gets fewer than the game gives it, and with every setting at its lowest the mod changes nothing[/color][/size][/*]
 [/list]
 
@@ -21,6 +22,12 @@
 [code]Flame level        0   1   2   3   4   5   6   7   8   9  10  11+
 The game           1   2   4   6   8  10  11  12  13  14  15  16
 More Flame Altars 16  16  16  16  16  16  16  16  16  16  16  16[/code]
+
+[size=3][color=#D4D4D8]The build area by altar level (one side of its cube):[/color][/size]
+[code]Altar level            1      2      3      4      5
+The game              40 m   80 m  120 m  160 m  160 m
+buildArea 150         60 m  120 m  180 m  240 m  240 m
+buildArea 200 (max)   80 m  160 m  240 m  320 m  320 m[/code]
 
 [quote][size=3][b][color=#F9C74F]More than 16? Up to 128, at your own risk[/color][/b]
 [color=#D4D4D8]The game is built for 16 bases: its own code allows at most 16 Flame Altars, and the part of the game that runs bases (comfort, crafting from base chests, survivors' beds, animals, the journal's base list) keeps 16 zones and 16 bases.
@@ -32,18 +39,17 @@ With [b]mergeBases[/b] (on by default together with beyondSixteen), once your wo
 Known risks: nobody has tested more than 16 altars with this version in a real game yet; other mods' "unlimited altars" are reported to crash the game past about 36 altars, for reasons never pinned down; past about 43 zones the game's zone message to players gets big, and a player may miss zone updates; a player's game draws at most 32 zone borders at once.[/color][/size][/quote]
 [line]
 [size=5][b][color=#FF6A1A]Installation instructions[/color][/b][/size]
-[size=3][color=#D4D4D8]This mod needs [url=https://www.nexusmods.com/enshrouded/mods/301][color=#F9C74F]Kiln[/color][/url] [b]0.2.0-dev.28 or later[/b], on the server and on every player's game: the game reads these numbers on both sides.[/color][/size]
+[size=3][color=#D4D4D8]This mod needs [url=https://www.nexusmods.com/enshrouded/mods/301][color=#F9C74F]Kiln[/color][/url] [b]0.2.0-dev.29.18 or later[/b], on the server and on every player's game: the game reads these numbers on both sides. On Kiln 0.2.0-dev.28 to 0.2.0-dev.29.17, use 0.3.0 from the Files tab (no build area setting).[/color][/size]
 
 [size=4][b][color=#F9C74F]Dedicated server[/color][/b][/size]
-[size=3][color=#D4D4D8]Unzip it into the server's [b]kiln/mods/[/b] folder and restart the server. The settings are in [b]kiln/config/more-flame-altars.json[/b] (or in /altars) and apply at the next start; with [b]beyondSixteen[/b] on, the altar settings apply at once. Players who join need the mod too; a server's Kiln modpack can hand it to them.[/color][/size]
-[size=3][color=#D4D4D8]Players' games load it on their own since Kiln 0.2.0-dev.29: Kiln's modpack hands it to players who join a Kiln server, and no [b]"preview"[/b] setting is needed. If you added [b]"preview": ["mods.boot.client", "mods.boot.resource_patches"][/b] for Kiln 0.2.0-dev.28, it is no longer needed; leaving it does no harm.[/color][/size]
+[size=3][color=#D4D4D8]Unzip it into the server's [b]kiln/mods/[/b] folder and restart the server. The settings are in [b]kiln/config/more-flame-altars.json[/b] (or in /altars) and apply at the next start; with [b]beyondSixteen[/b] on, the altar settings apply at once. Players who join need the mod too: Kiln's modpack hands it to players who join a Kiln server, and their game loads it with no extra setting.[/color][/size]
 
 [size=4][b][color=#F9C74F]Playing on your own, or hosting[/color][/b][/size]
 [list=1]
 [*][size=3][color=#D4D4D8]Open the Kiln Launcher's [b]Library[/b] page and drop in the zip from the Files tab.[/color][/size][/*]
 [*][size=3][color=#D4D4D8]Add it to your profile under [b]Profiles[/b], then press [b]Play[/b].[/color][/size][/*]
 [/list]
-[size=3][color=#D4D4D8]On a world you host from your own game it loads with no extra setting since Kiln 0.2.0-dev.29.[/color][/size]
+[size=3][color=#D4D4D8]On a world you host from your own game it loads with no extra setting.[/color][/size]
 [line]
 [size=5][b][color=#FF6A1A]Settings[/color][/b][/size]
 [list]
@@ -53,6 +59,7 @@ Known risks: nobody has tested more than 16 altars with this version in a real g
 [*][size=3][color=#D4D4D8][b]extraWaterSources[/b] (0): added to the game's own number of water sources[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]beyondSixteen[/b] (off): experimental, more than 16 altars (up to 128), may crash your game, see above[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]mergeBases[/b] (on, only with beyondSixteen): past 16 altar zones, all altars are one base, see above[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]buildArea[/b] (100): every altar's build area in percent of the game's, 100 to 200; applies at the next start, to new and placed altars[/color][/size][/*]
 [/list]
 [size=3][color=#D4D4D8]Admins can also use [b]/altars set <setting> <value>[/b] and [b]/altars flame <level>[/b] in the chat or from the server console.[/color][/size]
 [line]
@@ -61,6 +68,9 @@ Known risks: nobody has tested more than 16 altars with this version in a real g
 [list]
 [*][size=3][color=#D4D4D8][b]The limit patch does not rewrite the game's files or your save.[/b] Kiln changes the numbers each time the game starts, before the game reads them. Remove the mod and the next start has the game's numbers again. Altars you already placed should stay; you just cannot place new ones until your Flame level allows it. Changing the world's Flame level through /altars changes world progress and is saved by the game.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Every player needs the mod.[/b] A game without it shows and enforces the game's own numbers on its side.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Why buildArea stops at 200:[/b] the game saves terrain only inside bases, so the save grows with the build area, and the area grows with the cube of the setting (200 is eight times the game's volume per altar). On a lab server, 250 made the save about seven times the game's size. Bigger areas also reach neighbouring altars sooner, and altars whose areas touch are one base.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]buildArea is server-tested:[/b] on a lab server the bigger areas, new and placed altars and the save all behaved as described; the check in a player's game (the border you see, building at the new edge) is still to come.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Lowering buildArea again[/b] (or removing the mod) shrinks the areas at the next start: terrain and building blocks outside the smaller areas are then no longer base terrain and are gone after the next save and restart. Furniture and other placed items stay. Lower it only when nothing you built stands outside the smaller areas.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Do not combine it[/b] with another tool that changes the altar limit, the game's bases or the game's data files (the Embervale Toolkit's altar switch and its "Tweaks" tab, or XHL's Unlimited Flame Altars, for example).[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Thanks to XHL[/b] for the technique behind mergeBases.[/color][/size][/*]
 [/list]

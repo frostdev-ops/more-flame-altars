@@ -1,4 +1,4 @@
-<Project Sdk="Kiln.Sdk/0.2.0-dev.28">
+<Project Sdk="Kiln.Sdk/0.2.0-dev.29.18">
   <!-- A lab check, not part of the mod: [KilnTest] methods that read, in a running server, the game data the mod patched.
        Deploy it with "kiln deploy tests/LabTest" and run it with "kiln test more-flame-altars-labtest", both with the
        lab's name as the server. -->
@@ -7,12 +7,12 @@
     <KilnModName>More Flame Altars lab test</KilnModName>
     <Version>0.1.0</Version>
     <KilnSide>server</KilnSide>
-    <KilnServices>Assets;Quests;Testing;Hooks</KilnServices>
+    <KilnServices>Assets;Quests;Testing;Hooks;Build;World</KilnServices>
     <KilnAdvanced>true</KilnAdvanced>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <KilnGameIds>None</KilnGameIds>
   </PropertyGroup>
   <ItemGroup>
-    <KilnDependency Include="more-flame-altars" Version="0.3.0" />
+    <KilnDependency Include="more-flame-altars" Version="0.4.0" />
   </ItemGroup>
 </Project>

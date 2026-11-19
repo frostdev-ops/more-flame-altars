@@ -41,6 +41,12 @@ public sealed class Settings
     [Comment("Water sources added to the game's own number at every Flame level, up to 50. 0 adds none."),
      Range(0, 49), RequiresRestart]
     public int ExtraWaterSources { get; set; }
+
+    [Comment("The build area of every Flame Altar, in percent of the game's own: 100 keeps the game's sizes, 200 makes " +
+             "it twice as wide, deep and high. The game's sizes by altar level: 40, 80, 120, 160 and 160 metres. Up to " +
+             "200 (320 metres at the top altar levels). Applies to new and placed altars from the next start."),
+     Range(100, MoreFlameAltarsMod.BuildAreaCap), RequiresRestart]
+    public int BuildArea { get; set; } = 100;
 }
 
 /// <summary>Raises the game's lists of Flame Altars and water sources per Flame level (keen::BalancingTable,
@@ -49,7 +55,7 @@ public sealed class Settings
 public sealed partial class MoreFlameAltarsMod : Mod
 {
     /// <summary>The game's balancing table: the one resource of its type.</summary>
-    private static readonly Guid BalancingTable = Guid.Parse("82706b40-61b1-4b8f-8b23-dcec6971bda1");
+    internal static readonly Guid BalancingTableId = Guid.Parse("82706b40-61b1-4b8f-8b23-dcec6971bda1");
 
     /// <summary>The highest number the game's own lists hold: the game's code caps altars at 16, and 50 water sources is
     /// the most its table gives. The mod never goes past either, except altars with beyondSixteen (up to
@@ -57,6 +63,15 @@ public sealed partial class MoreFlameAltarsMod : Mod
     internal const int AltarCap = 16, WaterCap = 50, AltarHardCap = 128;
 
     internal static int CapOf(Settings s) => s.BeyondSixteen ? AltarHardCap : AltarCap;
+
+    /// <summary>The build area's cap, in percent of the game's sizes (README.md, "Bigger build areas", says why).</summary>
+    internal const int BuildAreaCap = 200;
+
+    /// <summary>The game's build area (one side of its cube, metres) at altar level 0 to 5 (game data 1287369).</summary>
+    internal static readonly int[] GameBuildArea = [0, 40, 80, 120, 160, 160];
+
+    /// <summary>One side of the build area at an altar level, in metres, with <paramref name="percent"/>.</summary>
+    internal static double BuildAreaAt(int gameMetres, int percent) => gameMetres * Math.Clamp(percent, 100, BuildAreaCap) / 100.0;
 
     public override void OnBoot(BootContext boot)
     {
@@ -142,7 +157,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
         _mergeWanted = saved.BeyondSixteen && saved.MergeBases && AltarLimitHook.Installed;
         if (!IsServerSide) return "A game that joins a server follows the server's numbers.";
         var running = Cfg().Value;
-        var waterLater = saved.WaterSources != running.WaterSources || saved.ExtraWaterSources != running.ExtraWaterSources;
+        var waterLater = saved.WaterSources != running.WaterSources || saved.ExtraWaterSources != running.ExtraWaterSources ||
+                         saved.BuildArea != running.BuildArea;
         string? failed = null;
         // a failure is in the text, which the window's request and /altars set log and answer
         if (!AltarLimitHook.Installed && saved.BeyondSixteen && !AltarLimitHook.Install(HookRules(), out var why)) failed = why;
@@ -157,7 +173,7 @@ public sealed partial class MoreFlameAltarsMod : Mod
             Altars = saved.Altars, ExtraAltars = saved.ExtraAltars, BeyondSixteen = saved.BeyondSixteen, MergeBases = saved.MergeBases,
         };
         Log.Info($"More Flame Altars: the Flame Altar limit now: {Describe(altarsOnly)}" + (sent > 0 ? $"; sent to {sent} player(s)" : ""));
-        return "The Flame Altar limit applies now." + (waterLater ? " Water sources: " + AppliesWhen() : "") + merge;
+        return "The Flame Altar limit applies now." + (waterLater ? " Water sources and the build area: " + AppliesWhen() : "") + merge;
     }
 
     /// <summary>Whether this server (or hosted world) merges bases past 16 zones: the saved settings' wish, set on the
@@ -187,10 +203,24 @@ public sealed partial class MoreFlameAltarsMod : Mod
     /// <summary>The boot patch for these settings, or null when they leave every number as the game has it.</summary>
     internal static ResourcePatchBlock? Patch(Settings s)
     {
-        var block = new ResourcePatchBlock { Resource = BalancingTable, Type = "keen::BalancingTable" };
+        var block = new ResourcePatchBlock { Resource = BalancingTableId, Type = "keen::BalancingTable" };
         if (Raise(s.Altars, s.ExtraAltars, CapOf(s)) is { } altars) block.Set["altarsPerFlameLevel[*]"] = altars;
         if (Raise(s.WaterSources, s.ExtraWaterSources, WaterCap) is { } water) block.Set["waterSourcesPerFlameLevel[*]"] = water;
+        if (Scale(s.BuildArea) is { } area)
+            foreach (var axis in BuildAreaAxes) block.Set[$"buildzoneSizesPerAltarLevel[*].{axis}"] = area;
         return block.Set.Count == 0 ? null : block;
+    }
+
+    /// <summary>The three sides of the game's build-area cube (BlobArray&lt;float3&gt; buildzoneSizesPerAltarLevel).</summary>
+    internal static readonly string[] BuildAreaAxes = ["x", "y", "z"];
+
+    /// <summary>The game's build-area size times <paramref name="percent"/> / 100 (100 to the cap), never below the game's.
+    /// Null at 100, which changes nothing.</summary>
+    private static ResourceValue? Scale(int percent)
+    {
+        percent = Math.Clamp(percent, 100, BuildAreaCap);
+        if (percent == 100) return null;
+        return new ResourceValue { Mul = percent / 100.0, RaiseOnly = true };
     }
 
     /// <summary>The game's value plus <paramref name="extra"/>, at least <paramref name="atLeast"/>, at most
@@ -217,6 +247,9 @@ public sealed partial class MoreFlameAltarsMod : Mod
                       (!s.BeyondSixteen ? "" : s.MergeBases ? " (above 16: one merged base, experimental)" : " (above 16: build-only, experimental)"));
         if (Raise(s.WaterSources, s.ExtraWaterSources, WaterCap) is not null)
             parts.Add(Words("water sources", s.WaterSources, s.ExtraWaterSources, WaterCap));
+        if (Scale(s.BuildArea) is not null)
+            parts.Add($"build areas at {Math.Clamp(s.BuildArea, 100, BuildAreaCap)}% of the game's " +
+                      $"({BuildAreaAt(GameBuildArea[1], s.BuildArea):0.#} to {BuildAreaAt(GameBuildArea[^1], s.BuildArea):0.#} m)");
         return string.Join("; ", parts);
     }
 

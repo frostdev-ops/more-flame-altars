@@ -1,6 +1,6 @@
-<Project Sdk="Kiln.Sdk/0.2.0-dev.28">
-  <!-- More Flame Altars: 16 Flame Altars at every Flame level. One boot-time change of the game's balancing table
-       (Mod.OnBoot, a ResourcePatchBlock): Kiln 0.2.0-dev.28 or later.
+<Project Sdk="Kiln.Sdk/0.2.0-dev.29.18">
+  <!-- More Flame Altars: 16 Flame Altars at every Flame level, optionally more water sources and bigger build areas. One
+       boot-time change of the game's balancing table (Mod.OnBoot, a ResourcePatchBlock): Kiln 0.2.0-dev.29.18 or later.
          dotnet build -t:KilnDeploy -p:KilnServer=<server folder>
          dotnet build -c Release -t:KilnPack -p:KilnPackageOutputPath=dist/      (the zip the launcher's Library imports)
        KilnBoot writes "boot": true into the generated kiln.mod.json: the mod's OnBoot runs before the game reads its data.
@@ -8,8 +8,8 @@
   <PropertyGroup>
     <KilnModId>more-flame-altars</KilnModId>
     <KilnModName>More Flame Altars</KilnModName>
-    <Version>0.3.0</Version>
-    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones.</Description>
+    <Version>0.4.0</Version>
+    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones. Bigger build areas around every altar, up to twice the game's size.</Description>
     <Authors>Frostdev</Authors>
     <AssemblyName>MoreFlameAltars</AssemblyName>
     <RootNamespace>MoreFlameAltars</RootNamespace>
@@ -22,7 +22,7 @@
     <!-- Kiln.Hooks for beyondSixteen (the game's altar-limit function; off by default) and mergeBases (the game's base
          system, BaseMergeHook.cs): needs the advanced tier -->
     <KilnAdvanced>true</KilnAdvanced>
-    <KilnServices>Blocks;Quests;Network;Ui;Chat;Permissions;Hooks;Client</KilnServices>
+    <KilnServices>Blocks;Quests;Network;Ui;Chat;Permissions;Hooks;Client;Assets</KilnServices>
     <KilnGameIds>None</KilnGameIds>
     <!-- BaseMergeHook.cs reads and writes the game's base system through pointers -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
