@@ -2,7 +2,7 @@
 // The messages between the server's part of the mod and the window in a player's game (channel "more-flame-altars:ui").
 // Registered in the same order on both sides: AltarsState 0, AltarsRequest 1, AltarsResult 2, AltarsLimits 3. Channel
 // version 4 since 0.4.0 (buildArea in the settings, the build area at each altar level in AltarsState); version 3 was
-// 0.3.0 (mergeBases).
+// 0.3.0 (mergeBases). 0.4.1 keeps this wire format: Note carries the cap warning, and build-area sides are capped at 240 m.
 using Kiln;
 
 namespace MoreFlameAltars;
@@ -53,7 +53,8 @@ internal static class SettingIndex
 /// <summary>Server to client: what the window shows. <see cref="Open"/> asks the window to open (the /altars command);
 /// otherwise it only refreshes an open one.</summary>
 /// <param name="Running">The settings the server started with (what the world uses now).</param>
-/// <param name="Saved">The settings in the server's file (used from its next start).</param>
+/// <param name="Saved">The settings in the server's file (used from its next start). BuildArea keeps the requested
+/// percent for compatibility with 0.4.0 settings; the boot patch caps each resulting side at 240 m.</param>
 /// <param name="AltarsByLevel">Altars the world allows at each Flame level, as the server's game reads them now.</param>
 /// <param name="WaterByLevel">Water sources the world allows at each Flame level.</param>
 /// <param name="AreaByAltarLevel">One side of the build area, in whole metres, at altar level 1 and up, as the server's

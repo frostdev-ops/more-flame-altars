@@ -103,7 +103,7 @@ public sealed partial class MoreFlameAltarsMod
         return Summary() + (c.Source.IsPlayer ? " (the window needs More Flame Altars in your game)" : "");
     }
 
-    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1, buildArea 100-200); most apply at the next start",
+    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1, buildArea 100-200, each side capped at 240 m); most apply at the next start",
         Permission = CommandPermission.Admin, Node = ManageNode)]
     private string SetCommand(CommandContext c, string setting, int value)
     {
@@ -193,6 +193,8 @@ public sealed partial class MoreFlameAltarsMod
         var allowed = flame is null ? null : WorldProgress.LimitsAt(flame.Level);
         var (active, note) = Activity(cfg.Value);
         if (!running.SequenceEqual(saved)) note = (note.Length > 0 ? note + " " : "") + "Saved settings differ from the running ones. " + AppliesWhen();
+        if (BuildAreaWarning(Math.Max(running[SettingIndex.BuildArea], saved[SettingIndex.BuildArea])) is { Length: > 0 } warning)
+            note += (note.Length > 0 ? "\n" : "") + warning;
         return new AltarsState(open, Permissions.Has(player, ManageNode), Hosted, active, note,
             flame?.Level ?? -1, max, flame?.Altars ?? -1,
             allowed is null ? -1 : hooked ? AltarLimitHook.Answer((uint)flame!.Level, allowed.Altars) : Math.Min(allowed.Altars, AltarCap),
@@ -282,7 +284,7 @@ public sealed partial class MoreFlameAltarsMod
         var s = Snapshot(EntityId.None, open: false);
         var where = s.FlameLevel < 0 ? "No world is running." :
             $"Flame level {s.FlameLevel} of {s.FlameMax}: {s.Altars} of {s.AltarsAllowed} Flame Altars, {s.Water} of {s.WaterAllowed} water sources.";
-        return $"{where} {Describe(SettingIndex.From(s.Running))}. {s.Note}".Trim();
+        return $"{where} {Describe(SettingIndex.From(s.Running))}.".Trim() + (s.Note.Length > 0 ? "\n" + s.Note : "");
     }
 
     /// <summary>An action from a player's window (tick thread).</summary>

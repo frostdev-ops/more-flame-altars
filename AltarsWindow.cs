@@ -193,7 +193,8 @@ public sealed partial class MoreFlameAltarsMod
 
             ui.Separator("Build area");
             ui.Slider("Build area, percent of the game's", ref edit[SettingIndex.BuildArea], 100, BuildAreaCap);
-            ui.Tooltip("Every Flame Altar's build area, as wide, deep and high as the game's times this. 100 keeps the game's sizes.");
+            ui.Tooltip("Every Flame Altar's build area, scaled on all three sides, then capped at 240 m. 100 keeps the game's sizes.");
+            ui.TextWrapped("Each side is capped at 240 m: levels 4-5 stop growing at 150%; levels 1-3 can scale up to 200%.");
             ui.TextDisabled($"One side: {BuildAreaAt(GameBuildArea[1], edit[SettingIndex.BuildArea]):0.#} m at altar level 1, " +
                             $"{BuildAreaAt(GameBuildArea[^1], edit[SettingIndex.BuildArea]):0.#} m at levels 4 and 5 " +
                             $"(the game's: {GameBuildArea[1]} and {GameBuildArea[^1]} m).");
@@ -261,8 +262,8 @@ public sealed partial class MoreFlameAltarsMod
 
     /// <summary>The build area in words: one side at altar level 1 and at the top level, and the percent.</summary>
     private static string AreaText(int[] byLevel, int percent) =>
-        byLevel.Length == 0 ? $"{percent}% of the game's"
-        : $"{byLevel[0]} to {byLevel[^1]} m by altar level" + (percent == 100 ? " (the game's)" : $" ({percent}% of the game's)");
+        byLevel.Length == 0 ? $"{percent}% requested, capped at {SafeBuildAreaMetres} m (sizes unavailable)"
+        : $"{byLevel[0]} to {byLevel[^1]} m by altar level" + (percent == 100 ? " (the game's)" : $" ({percent}% requested, capped at {SafeBuildAreaMetres} m)");
 
     /// <summary>Whether this game's own start-up settings differ from the server's in a way that matters: with the hook
     /// in, the altar settings follow the server, so only the others count.</summary>

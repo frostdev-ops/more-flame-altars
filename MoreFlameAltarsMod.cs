@@ -42,9 +42,9 @@ public sealed class Settings
      Range(0, 49), RequiresRestart]
     public int ExtraWaterSources { get; set; }
 
-    [Comment("The build area of every Flame Altar, in percent of the game's own: 100 keeps the game's sizes, 200 makes " +
-             "it twice as wide, deep and high. The game's sizes by altar level: 40, 80, 120, 160 and 160 metres. Up to " +
-             "200 (320 metres at the top altar levels). Applies to new and placed altars from the next start."),
+    [Comment("The build area of every Flame Altar, in percent of the game's own: 100 keeps the game's sizes, up to " +
+             "200 for levels 1-3. Every side is capped at 240 metres: levels 4-5 stop growing at 150%. Larger build " +
+             "areas wrap in the game and delete builds. Applies to new and placed altars from the next start."),
      Range(100, MoreFlameAltarsMod.BuildAreaCap), RequiresRestart]
     public int BuildArea { get; set; } = 100;
 }
@@ -64,18 +64,35 @@ public sealed partial class MoreFlameAltarsMod : Mod
 
     internal static int CapOf(Settings s) => s.BeyondSixteen ? AltarHardCap : AltarCap;
 
-    /// <summary>The build area's cap, in percent of the game's sizes (README.md, "Bigger build areas", says why).</summary>
+    /// <summary>The requested build-area scale, in percent. Each resulting side has a separate safety cap.</summary>
     internal const int BuildAreaCap = 200;
+
+    /// <summary>The largest side proven safe in the field. Larger areas can wrap and lose saved building blocks.</summary>
+    internal const int SafeBuildAreaMetres = 240;
 
     /// <summary>The game's build area (one side of its cube, metres) at altar level 0 to 5 (game data 1287369).</summary>
     internal static readonly int[] GameBuildArea = [0, 40, 80, 120, 160, 160];
 
     /// <summary>One side of the build area at an altar level, in metres, with <paramref name="percent"/>.</summary>
-    internal static double BuildAreaAt(int gameMetres, int percent) => gameMetres * Math.Clamp(percent, 100, BuildAreaCap) / 100.0;
+    internal static double BuildAreaAt(int gameMetres, int percent) =>
+        Math.Min(SafeBuildAreaMetres, gameMetres * Math.Clamp(percent, 100, BuildAreaCap) / 100.0);
+
+    internal static string BuildAreaWarning(int percent) => percent > 150
+        ? "levels 4-5 are capped at 240 m; larger build areas wrap in the game and delete builds" : "";
+
+    private bool _buildAreaCapWarned;
+
+    private void WarnBuildAreaCap(int percent)
+    {
+        if (_buildAreaCapWarned || BuildAreaWarning(percent) is not { Length: > 0 } warning) return;
+        _buildAreaCapWarned = true;
+        Log.Warn("More Flame Altars: " + warning);
+    }
 
     public override void OnBoot(BootContext boot)
     {
         var s = Config.Register<Settings>().Value;
+        WarnBuildAreaCap(s.BuildArea);
         var block = Patch(s);
         if (block is null)
         {
@@ -90,6 +107,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
     public override void OnLoad()
     {
         OpenChannel();
+        // OnBoot uses a separate instance, and already warned for this start's running setting.
+        _buildAreaCapWarned = BuildAreaWarning(Cfg().Value.BuildArea).Length > 0;
         _observedSettings = Saved(Cfg());
         Context.Tick.Pre += CheckSettings;
         if (Ui.Available) OpenWindow();
@@ -153,6 +172,7 @@ public sealed partial class MoreFlameAltarsMod : Mod
     {
         _observedSettings = Saved(Cfg());
         var saved = SettingIndex.From(_observedSettings);
+        WarnBuildAreaCap(saved.BuildArea);
         // kept up to date while this game is joined too, so hosting a world later merges by the settings as they are now
         _mergeWanted = saved.BeyondSixteen && saved.MergeBases && AltarLimitHook.Installed;
         if (!IsServerSide) return "A game that joins a server follows the server's numbers.";
@@ -214,13 +234,13 @@ public sealed partial class MoreFlameAltarsMod : Mod
     /// <summary>The three sides of the game's build-area cube (BlobArray&lt;float3&gt; buildzoneSizesPerAltarLevel).</summary>
     internal static readonly string[] BuildAreaAxes = ["x", "y", "z"];
 
-    /// <summary>The game's build-area size times <paramref name="percent"/> / 100 (100 to the cap), never below the game's.
-    /// Null at 100, which changes nothing.</summary>
+    /// <summary>Scale each side independently, then cap it at the safe maximum. Do not use RaiseOnly here: it could
+    /// override the safety cap if an original side ever exceeded it. Null at 100, which changes nothing.</summary>
     private static ResourceValue? Scale(int percent)
     {
         percent = Math.Clamp(percent, 100, BuildAreaCap);
         if (percent == 100) return null;
-        return new ResourceValue { Mul = percent / 100.0, RaiseOnly = true };
+        return new ResourceValue { Mul = percent / 100.0, Max = SafeBuildAreaMetres };
     }
 
     /// <summary>The game's value plus <paramref name="extra"/>, at least <paramref name="atLeast"/>, at most
@@ -248,8 +268,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
         if (Raise(s.WaterSources, s.ExtraWaterSources, WaterCap) is not null)
             parts.Add(Words("water sources", s.WaterSources, s.ExtraWaterSources, WaterCap));
         if (Scale(s.BuildArea) is not null)
-            parts.Add($"build areas at {Math.Clamp(s.BuildArea, 100, BuildAreaCap)}% of the game's " +
-                      $"({BuildAreaAt(GameBuildArea[1], s.BuildArea):0.#} to {BuildAreaAt(GameBuildArea[^1], s.BuildArea):0.#} m)");
+            parts.Add($"build areas at {Math.Clamp(s.BuildArea, 100, BuildAreaCap)}% requested " +
+                      $"({BuildAreaAt(GameBuildArea[1], s.BuildArea):0.#} to {BuildAreaAt(GameBuildArea[^1], s.BuildArea):0.#} m, capped at {SafeBuildAreaMetres} m per side)");
         return string.Join("; ", parts);
     }
 

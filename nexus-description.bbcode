@@ -13,7 +13,7 @@
 [*][size=3][color=#D4D4D8][b]Altars:[/b] at least 16 at every Flame level (default), or any number from 1 to 16, or up to 128 with the experimental beyondSixteen[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Extra altars:[/b] the game's own number plus a few at every level, for the game's progression with more room[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Water sources:[/b] optionally more water sources at every level, up to the game's own top of 50[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]Bigger build areas (new in 0.4.0):[/b] every Flame Altar's build area up to twice as wide, deep and high as the game's, for new altars and the ones you already placed[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Bigger build areas (fixed in 0.4.1):[/b] levels 1-3 up to twice as wide, deep and high as the game's; each side capped at 240 m, so levels 4-5 stop growing at 150%, for new and placed altars[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]/altars:[/b] type it in the chat for a window with your world's Flame level, the altars and water sources placed and allowed, the build area, and the numbers at every level. Admins change the settings and the world's Flame level right there; everyone else can look[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Never less:[/b] a level never gets fewer than the game gives it, and with every setting at its lowest the mod changes nothing[/color][/size][/*]
 [/list]
@@ -27,7 +27,10 @@ More Flame Altars 16  16  16  16  16  16  16  16  16  16  16  16[/code]
 [code]Altar level            1      2      3      4      5
 The game              40 m   80 m  120 m  160 m  160 m
 buildArea 150         60 m  120 m  180 m  240 m  240 m
-buildArea 200 (max)   80 m  160 m  240 m  320 m  320 m[/code]
+buildArea 200 (max)   80 m  160 m  240 m  240 m  240 m[/code]
+
+[quote][size=3][b][color=#F9C74F]0.4.1 data-loss fix: update every player and the server[/color][/b]
+[color=#D4D4D8]Earlier versions could make the build area wrap at levels 4-5 above 150%, deleting builds; 0.4.1 caps it. If blocks are missing, restore a backup from before the change. Existing 151-200% settings are capped automatically when 0.4.1 loads; the percentage stays so levels 1-3 still scale fully. The window shows the real capped sizes, and /altars and the server log warn when the cap applies.[/color][/size][/quote]
 
 [quote][size=3][b][color=#F9C74F]More than 16? Up to 128, at your own risk[/color][/b]
 [color=#D4D4D8]The game is built for 16 bases: its own code allows at most 16 Flame Altars, and the part of the game that runs bases (comfort, crafting from base chests, survivors' beds, animals, the journal's base list) keeps 16 zones and 16 bases.
@@ -59,7 +62,7 @@ Known risks: nobody has tested more than 16 altars with this version in a real g
 [*][size=3][color=#D4D4D8][b]extraWaterSources[/b] (0): added to the game's own number of water sources[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]beyondSixteen[/b] (off): experimental, more than 16 altars (up to 128), may crash your game, see above[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]mergeBases[/b] (on, only with beyondSixteen): past 16 altar zones, all altars are one base, see above[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]buildArea[/b] (100): every altar's build area in percent of the game's, 100 to 200; applies at the next start, to new and placed altars[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]buildArea[/b] (100): every altar's build area in percent of the game's, 100 to 200, with each side capped at 240 m (levels 4-5 stop at 150%); applies at the next start, to new and placed altars[/color][/size][/*]
 [/list]
 [size=3][color=#D4D4D8]Admins can also use [b]/altars set <setting> <value>[/b] and [b]/altars flame <level>[/b] in the chat or from the server console.[/color][/size]
 [line]
@@ -68,8 +71,8 @@ Known risks: nobody has tested more than 16 altars with this version in a real g
 [list]
 [*][size=3][color=#D4D4D8][b]The limit patch does not rewrite the game's files or your save.[/b] Kiln changes the numbers each time the game starts, before the game reads them. Remove the mod and the next start has the game's numbers again. Altars you already placed should stay; you just cannot place new ones until your Flame level allows it. Changing the world's Flame level through /altars changes world progress and is saved by the game.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Every player needs the mod.[/b] A game without it shows and enforces the game's own numbers on its side.[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]Why buildArea stops at 200:[/b] the game saves terrain only inside bases, so the save grows with the build area, and the area grows with the cube of the setting (200 is eight times the game's volume per altar). On a lab server, 250 made the save about seven times the game's size. Bigger areas also reach neighbouring altars sooner, and altars whose areas touch are one base.[/color][/size][/*]
-[*][size=3][color=#D4D4D8][b]buildArea is server-tested:[/b] on a lab server the bigger areas, new and placed altars and the save all behaved as described; the check in a player's game (the border you see, building at the new edge) is still to come.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]Why each side stops at 240 m:[/b] 240 m is the largest value reported safe. At levels 4-5, 159% (254.4 m) already lost blocks; 160% (256 m) wrapped to 0 m and 180% (288 m) to 32 m. The game stops saving blocks outside that smaller area. Levels 1-3 still reach 200% (80/160/240 m); levels 4-5 cap at 150% (240 m). Bigger areas also grow saves and reach neighbouring altars sooner.[/color][/size][/*]
+[*][size=3][color=#D4D4D8][b]What is tested:[/b] 0.4.1 has offline regressions for the 240 m cap at every level and percentage from 100 to 200, the warning and old settings loading safely. No new game or server test was run for 0.4.1. The old 0.4.0 lab checks placed only level-1 altars and missed this data-loss bug at upgraded altars.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Lowering buildArea again[/b] (or removing the mod) shrinks the areas at the next start: terrain and building blocks outside the smaller areas are then no longer base terrain and are gone after the next save and restart. Furniture and other placed items stay. Lower it only when nothing you built stands outside the smaller areas.[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Do not combine it[/b] with another tool that changes the altar limit, the game's bases or the game's data files (the Embervale Toolkit's altar switch and its "Tweaks" tab, or XHL's Unlimited Flame Altars, for example).[/color][/size][/*]
 [*][size=3][color=#D4D4D8][b]Thanks to XHL[/b] for the technique behind mergeBases.[/color][/size][/*]

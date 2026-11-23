@@ -13,6 +13,6 @@
     <KilnGameIds>None</KilnGameIds>
   </PropertyGroup>
   <ItemGroup>
-    <KilnDependency Include="more-flame-altars" Version="0.4.0" />
+    <KilnDependency Include="more-flame-altars" Version="0.4.1" />
   </ItemGroup>
 </Project>

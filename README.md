@@ -5,15 +5,15 @@
 More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources, and bigger
 build areas around every altar.
 
-> **Which version?** This README describes 0.4.0, which needs Kiln 0.2.0-dev.29.18 or later. On Kiln 0.2.0-dev.28 to
+> **Which version?** This README describes 0.4.1, which needs Kiln 0.2.0-dev.29.18 or later. On Kiln 0.2.0-dev.28 to
 > 0.2.0-dev.29.17, use **0.3.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases) (no build
 > area setting). Still on Kiln 0.2.0-dev.27? Use **0.1.0**: 16 Flame Altars at every Flame level (see
 > [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
 
 The game ties the number of Flame Altars to the world's Flame level: a new world allows 2, and the game only reaches 16
 at Flame level 11. By default this mod allows 16 at every level, so you can found all your bases from the start. Or keep
-the game's progression and add a few on top. With `buildArea`, every altar's build area can be up to twice as wide,
-deep and high as the game's.
+the game's progression and add a few on top. With `buildArea`, levels 1-3 can be up to twice as wide, deep and high
+as the game's; every side is capped at **240 m**, so levels 4-5 stop growing at 150%.
 
 | Flame level | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 and up |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -54,29 +54,35 @@ area always wait for the next start.
 | `extraWaterSources` | 0 | Added to the game's own number of water sources at every level, up to 50. |
 | `beyondSixteen` | false | **Experimental, may crash your game.** Allows more than 16 Flame Altars, up to 128. See below. |
 | `mergeBases` | true | **Experimental**, only with `beyondSixteen`. With more than 16 altar zones in the world, all altars become one base, so altars past 16 are real base area. Off: altars past 16 are build-only. See below. |
-| `buildArea` | 100 | Every Flame Altar's build area, in percent of the game's (100 to 200). 100 keeps the game's sizes. See [Bigger build areas](#bigger-build-areas). |
+| `buildArea` | 100 | Every Flame Altar's build area, in percent of the game's (100 to 200), with each side capped at 240 m. Levels 4-5 stop growing at 150%. 100 keeps the game's sizes. See [Bigger build areas](#bigger-build-areas). |
 
 A level never gets less than the game gives it. With every setting at its lowest the mod changes nothing.
 
 ## Bigger build areas
 
 A Flame Altar's build area is a cube around it. Its size depends on the altar's level, not on the Flame level, and
-`buildArea` scales it on all three sides:
+`buildArea` scales it on all three sides, then caps **each side independently at 240 m**. Existing settings of
+151-200% are capped automatically when 0.4.1 loads; the saved percentage stays so levels 1-3 can still scale fully.
+The window, `/altars` console output and a once-per-start log warning explain the cap.
+
+> **Data-loss warning:** Earlier versions could make the build area wrap at levels 4-5 above 150%, deleting builds;
+> 0.4.1 caps it. If blocks are missing, restore a backup from before the change.
+> Update the server and **every player** to 0.4.1 before loading the world.
 
 | Altar level | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
 | One side, the game | 40 m | 80 m | 120 m | 160 m | 160 m |
 | One side, `buildArea: 150` | 60 m | 120 m | 180 m | 240 m | 240 m |
-| One side, `buildArea: 200` (the most) | 80 m | 160 m | 240 m | 320 m | 320 m |
+| One side, `buildArea: 200` (the most) | 80 m | 160 m | 240 m | 240 m | 240 m |
 
 - **When it applies:** at the next start of the server (or of your game, when you host). From then on every altar has
   the bigger area: new ones and the ones already placed (seen on the lab server with level-1 altars; every altar level
   reads the same table).
-- **Why at most 200:** the game saves terrain only inside bases, so the save grows with the build area, and the area
-  grows with the cube of the setting: 200 is already eight times the game's volume per altar. On a lab server a world
-  of 11 level-1 altars saved 0.6 MB at 100; 17 of them saved 3.8 MB at 200, and 250 made the save about seven times the
-  game's size. Bigger areas also reach neighbouring altars sooner, and altars whose areas touch or overlap are one base
-  in the game.
+- **Why 240 m per side:** 240 m is the largest value reported safe in the field. At levels 4-5, 159% (254.4 m)
+  already lost blocks after restarts; 160% (256 m) wrapped to 0 m, and 180% (288 m) wrapped to 32 m. The game stops
+  saving terrain and building blocks outside that smaller area. We do not use 252-255 m: they are not proven safe.
+  Levels 1-3 still reach 200% (80/160/240 m); levels 4-5 cap at 150% (240 m). Bigger areas also grow saves and reach
+  neighbouring altars sooner; altars whose areas touch or overlap are one base in the game.
 - **Lowering it again** (or removing the mod) shrinks every area at the next start. What lies outside the smaller area
   is then no longer base terrain: the game stops saving it, and after the next save and restart the terrain there is
   back to the world's own ground (seen on the lab server). Building blocks are terrain to the game, so **blocks you
@@ -148,6 +154,14 @@ world's Flame level through `/altars` does change world progress and is saved by
 
 ## What is checked
 
+0.4.1 is checked offline (`tests/Offline`), without starting the game or a server: every altar level and axis at
+every integer percentage from 100 to 200 stays at or below 240 m, the preview agrees with the capped patch, the
+warning explains the data-loss risk, and existing 0.4.0 settings from 151 to 200 load with the cap automatically.
+The package is built with the pinned Kiln 0.2.0-dev.29.18 SDK. **No new in-game or lab check was run for 0.4.1.**
+
+**Historical 0.4.0 checks were insufficient:** only level-1 altars were placed. Reading larger values in the table
+did not prove that upgraded altars could save builds safely; player reports exposed the wrapping and data loss.
+
 0.4.0, on a lab server (Kiln 0.2.0-dev.29.18 as released, server build 26430253, no player), by the lab test in
 `tests/LabTest` over eleven starts of one world with `buildArea` 100, 200, 100, 250 and 200 in that order (one 250
 start with `beyondSixteen`; the last start ran the packed 0.4.0 zip):
@@ -163,9 +177,9 @@ start with `beyondSixteen`; the last start ran the packed 0.4.0 zip):
   keep it) was still there after a restart at 200 and after the first start back at 100, and gone after the next one;
 - altars whose bigger zones overlap are one base in the game's base system (13 altar zones made 8 bases).
 
-The 0.3.0 checks below ran again in the starts with `beyondSixteen` off and passed. Offline (`tests/Offline`): the patch scales the three
-sides only above 100 and never past 200, goes into the same boot patch as the altars, and the settings refuse 99 and
-201 and settings from a 0.3.0 window.
+The 0.3.0 checks below ran again in the starts with `beyondSixteen` off and passed. The 0.4.0 offline checks covered
+scaling only above 100 and at most 200%, the shared boot patch, and refusing 99, 201 and settings from a 0.3.0 window;
+they did not check the safe per-side limit.
 
 0.3.0, on a lab server (Kiln 0.2.0-dev.28 as released, runtime 0.2.0-dev.28+20261114.2301cc5, server build 26430253, no
 player), by the lab test in `tests/LabTest`, with four settings: `altars: 128` with `beyondSixteen` and `mergeBases`;
@@ -204,6 +218,10 @@ too (then capped at 32), and the `/altars` window.
 
 ## Changes
 
+- **0.4.1**: urgent data-loss fix. Every build-area side is capped at 240 m, including existing 151-200% settings.
+  Levels 1-3 still scale to 200%; levels 4-5 stop at 150%. The window shows capped sizes and explains the cap, and
+  `/altars` and the log warn about unsafe saved settings. Earlier versions could wrap the area and delete builds;
+  if blocks are missing, restore a backup from before the change. Update every player and the server.
 - **0.4.0** (Kiln 0.2.0-dev.29.18): new `buildArea`: bigger build areas around every Flame Altar, up to twice the
   game's size on every side, in the same start-up patch as the altars. The `/altars` window is laid out again: one
   section per setting with its value and when it applies, the build area at every altar level, a "not saved yet"
@@ -240,7 +258,7 @@ To make its zip: `mkdir -p dist && (cd eml && zip -r ../dist/more-flame-altars-0
 ln -s ~/Kiln-release/kiln-0.2.0-dev.29.18/sdk kiln-sdk     # the SDK (its .nupkg files)
 dotnet build -c Release -t:KilnPack -p:KilnPackageOutputPath=dist/
 # managed regression checks; no game server needed
-dotnet run --project tests/Offline -c Release
+/mnt/Dongus/kiln-wave/tools/slot dotnet run --project tests/Offline -c Release
 # lab check (a lab made with Kiln's tools/lab/lab.sh, Kiln 0.2.0-dev.29.18 in it)
 lab=/path/to/lab
 dotnet build -c Release -t:KilnDeploy -p:KilnServer="$lab"

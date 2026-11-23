@@ -21,6 +21,8 @@ public sealed class BuildAreaTests
     /// <summary>One side of the game's build-area cube at altar level 0 to 5 (game data 1287369).</summary>
     private static readonly double[] GameSides = [0, 40, 80, 120, 160, 160];
 
+    private static double SideAt(int level, int percent) => Math.Min(240, GameSides[level] * Math.Clamp(percent, 100, 200) / 100.0);
+
     // BuildZoneSystem_addZone (0x916310): rcx is the server world's BuildZoneSystem. A mid hook at its first instruction
     // keeps the pointer; the system's lists are read from it, and the game's own queries are called on copies of them.
     private const string AddZone = "48 83 EC 78 8B 84 24 A8 00 00 00 4C 8B D1 89 44 24 60 48 8B 84 24 B8 00 00 00 44 88 4C 24 65 44 88 44 24 64 0F 10 00 48";
@@ -175,7 +177,7 @@ public sealed class BuildAreaTests
     private static int LevelOf(double side, int percent)
     {
         for (var level = 1; level < GameSides.Length; level++)
-            if (Math.Abs(side - GameSides[level] * percent / 100.0) < 0.05) return level;
+            if (Math.Abs(side - SideAt(level, percent)) < 0.05) return level;
         return -1;
     }
 
@@ -192,8 +194,8 @@ public sealed class BuildAreaTests
             {
                 var v = Convert.ToDouble(table[$"buildzoneSizesPerAltarLevel[{level}].{axis}"], CultureInfo.InvariantCulture);
                 if (axis == "x") have.Add(F(v));
-                Assert.True(Math.Abs(v - GameSides[level] * pct / 100.0) < 0.01,
-                    $"buildzoneSizesPerAltarLevel[{level}].{axis} = {F(v)}, want {F(GameSides[level] * pct / 100.0)} (buildArea {pct})");
+                Assert.True(Math.Abs(v - SideAt(level, pct)) < 0.01,
+                    $"buildzoneSizesPerAltarLevel[{level}].{axis} = {F(v)}, want {F(SideAt(level, pct))} (buildArea {pct})");
             }
         Say($"start with buildArea {pct}: the running table's sides by altar level [{string.Join(", ", have)}] m");
     }
@@ -229,7 +231,7 @@ public sealed class BuildAreaTests
             var history = seen[key] as JsonArray ?? new JsonArray();
             history.Add($"start {start}, buildArea {pct}: half {F(b.Half.X)}");
             seen[key] = history;
-            Assert.True(level > 0, $"altar {b.Altar}: zone side {F(side)} m is a game side times {pct}%");
+            Assert.True(level > 0, $"altar {b.Altar}: zone side {F(side)} m is a game side scaled by {pct}% and capped at 240 m");
             if (shape is { } sh)
                 Assert.True(Math.Abs(sh.X - b.Half.X) < 0.05 && Math.Abs(sh.Y - b.Half.Y) < 0.05 && Math.Abs(sh.Z - b.Half.Z) < 0.05,
                     $"altar {b.Altar}: the server's zone equals its TriggerShape ranges ({V(sh)} vs {V(b.Half)})");
@@ -254,7 +256,7 @@ public sealed class BuildAreaTests
             $"{List(bzs, Areas, AreaEntry).Count} building areas");
         // a box-shaped no-build box of a good size, away from every base, on loaded ground
         var game = GameSides[1] / 2;                 // a new altar is level 1: half 20 m in the game
-        var ours = GameSides[1] * pct / 200.0;       // and this much with the setting
+        var ours = SideAt(1, pct) / 2;       // and this much with the setting
         var gap = pct > 100 ? (game + ours) / 2 : game + 5;   // between the two borders (or just outside the game's)
         Box? target = null;
         WorldPosition at = default;
