@@ -103,7 +103,7 @@ public sealed partial class MoreFlameAltarsMod
         return Summary() + (c.Source.IsPlayer ? " (the window needs More Flame Altars in your game)" : "");
     }
 
-    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1, buildArea 100-200, each side capped at 240 m); most apply at the next start",
+    [Command("altars set", Description = "Sets one of More Flame Altars' settings (altars, extraAltars, waterSources, extraWaterSources, beyondSixteen 0/1, mergeBases 0/1, buildArea 100-200, each side capped at 239 m); most apply at the next start",
         Permission = CommandPermission.Admin, Node = ManageNode)]
     private string SetCommand(CommandContext c, string setting, int value)
     {

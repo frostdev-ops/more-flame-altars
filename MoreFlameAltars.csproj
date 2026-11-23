@@ -8,7 +8,7 @@
   <PropertyGroup>
     <KilnModId>more-flame-altars</KilnModId>
     <KilnModName>More Flame Altars</KilnModName>
-    <Version>0.4.1</Version>
+    <Version>0.4.2</Version>
     <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones. Bigger build areas around every altar, up to twice the game's size with each side capped at 240 m.</Description>
     <Authors>Frostdev</Authors>
     <AssemblyName>MoreFlameAltars</AssemblyName>

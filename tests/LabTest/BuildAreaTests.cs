@@ -21,7 +21,7 @@ public sealed class BuildAreaTests
     /// <summary>One side of the game's build-area cube at altar level 0 to 5 (game data 1287369).</summary>
     private static readonly double[] GameSides = [0, 40, 80, 120, 160, 160];
 
-    private static double SideAt(int level, int percent) => Math.Min(240, GameSides[level] * Math.Clamp(percent, 100, 200) / 100.0);
+    private static double SideAt(int level, int percent) => Math.Min(239, GameSides[level] * Math.Clamp(percent, 100, 200) / 100.0);
 
     // BuildZoneSystem_addZone (0x916310): rcx is the server world's BuildZoneSystem. A mid hook at its first instruction
     // keeps the pointer; the system's lists are read from it, and the game's own queries are called on copies of them.
@@ -231,7 +231,7 @@ public sealed class BuildAreaTests
             var history = seen[key] as JsonArray ?? new JsonArray();
             history.Add($"start {start}, buildArea {pct}: half {F(b.Half.X)}");
             seen[key] = history;
-            Assert.True(level > 0, $"altar {b.Altar}: zone side {F(side)} m is a game side scaled by {pct}% and capped at 240 m");
+            Assert.True(level > 0, $"altar {b.Altar}: zone side {F(side)} m is a game side scaled by {pct}% and capped at 239 m");
             if (shape is { } sh)
                 Assert.True(Math.Abs(sh.X - b.Half.X) < 0.05 && Math.Abs(sh.Y - b.Half.Y) < 0.05 && Math.Abs(sh.Z - b.Half.Z) < 0.05,
                     $"altar {b.Altar}: the server's zone equals its TriggerShape ranges ({V(sh)} vs {V(b.Half)})");

@@ -43,8 +43,8 @@ public sealed class Settings
     public int ExtraWaterSources { get; set; }
 
     [Comment("The build area of every Flame Altar, in percent of the game's own: 100 keeps the game's sizes, up to " +
-             "200 for levels 1-3. Every side is capped at 240 metres: levels 4-5 stop growing at 150%. Larger build " +
-             "areas wrap in the game and delete builds. Applies to new and placed altars from the next start."),
+             "200 for levels 1-3. Every side is capped at 239 metres: levels 4-5 stop growing at 149%. Larger build " +
+             "areas lose saved building blocks in the game. Applies to new and placed altars from the next start."),
      Range(100, MoreFlameAltarsMod.BuildAreaCap), RequiresRestart]
     public int BuildArea { get; set; } = 100;
 }
@@ -67,8 +67,10 @@ public sealed partial class MoreFlameAltarsMod : Mod
     /// <summary>The requested build-area scale, in percent. Each resulting side has a separate safety cap.</summary>
     internal const int BuildAreaCap = 200;
 
-    /// <summary>The largest side proven safe in the field. Larger areas can wrap and lose saved building blocks.</summary>
-    internal const int SafeBuildAreaMetres = 240;
+    /// <summary>The largest side that stays within the game's save limit wherever the altar stands: the world save keeps
+    /// at most 4,096 chunks of 16 m per base (a 256 m cube) and silently skips the rest, scattered across the base. A side
+    /// under 240 m touches at most 16 chunks per axis; exactly 240 m can touch 17 when a face sits on the chunk grid.</summary>
+    internal const int SafeBuildAreaMetres = 239;
 
     /// <summary>The game's build area (one side of its cube, metres) at altar level 0 to 5 (game data 1287369).</summary>
     internal static readonly int[] GameBuildArea = [0, 40, 80, 120, 160, 160];
@@ -77,8 +79,8 @@ public sealed partial class MoreFlameAltarsMod : Mod
     internal static double BuildAreaAt(int gameMetres, int percent) =>
         Math.Min(SafeBuildAreaMetres, gameMetres * Math.Clamp(percent, 100, BuildAreaCap) / 100.0);
 
-    internal static string BuildAreaWarning(int percent) => percent > 150
-        ? "levels 4-5 are capped at 240 m; larger build areas wrap in the game and delete builds" : "";
+    internal static string BuildAreaWarning(int percent) => GameBuildArea[^1] * Math.Clamp(percent, 100, BuildAreaCap) / 100.0 > SafeBuildAreaMetres
+        ? $"levels 4-5 are capped at {SafeBuildAreaMetres} m; larger build areas lose saved building blocks in the game" : "";
 
     private bool _buildAreaCapWarned;
 

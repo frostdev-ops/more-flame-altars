@@ -13,7 +13,7 @@ build areas around every altar.
 The game ties the number of Flame Altars to the world's Flame level: a new world allows 2, and the game only reaches 16
 at Flame level 11. By default this mod allows 16 at every level, so you can found all your bases from the start. Or keep
 the game's progression and add a few on top. With `buildArea`, levels 1-3 can be up to twice as wide, deep and high
-as the game's; every side is capped at **240 m**, so levels 4-5 stop growing at 150%.
+as the game's; every side is capped at **239 m**, so levels 4-5 stop growing at 149%.
 
 | Flame level | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 and up |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -54,34 +54,37 @@ area always wait for the next start.
 | `extraWaterSources` | 0 | Added to the game's own number of water sources at every level, up to 50. |
 | `beyondSixteen` | false | **Experimental, may crash your game.** Allows more than 16 Flame Altars, up to 128. See below. |
 | `mergeBases` | true | **Experimental**, only with `beyondSixteen`. With more than 16 altar zones in the world, all altars become one base, so altars past 16 are real base area. Off: altars past 16 are build-only. See below. |
-| `buildArea` | 100 | Every Flame Altar's build area, in percent of the game's (100 to 200), with each side capped at 240 m. Levels 4-5 stop growing at 150%. 100 keeps the game's sizes. See [Bigger build areas](#bigger-build-areas). |
+| `buildArea` | 100 | Every Flame Altar's build area, in percent of the game's (100 to 200), with each side capped at 239 m. Levels 4-5 stop growing at 149%. 100 keeps the game's sizes. See [Bigger build areas](#bigger-build-areas). |
 
 A level never gets less than the game gives it. With every setting at its lowest the mod changes nothing.
 
 ## Bigger build areas
 
 A Flame Altar's build area is a cube around it. Its size depends on the altar's level, not on the Flame level, and
-`buildArea` scales it on all three sides, then caps **each side independently at 240 m**. Existing settings of
-151-200% are capped automatically when 0.4.1 loads; the saved percentage stays so levels 1-3 can still scale fully.
+`buildArea` scales it on all three sides, then caps **each side independently at 239 m**. Existing settings of
+150-200% are capped automatically when 0.4.2 loads; the saved percentage stays so levels 1-3 can still scale fully.
 The window, `/altars` console output and a once-per-start log warning explain the cap.
 
-> **Data-loss warning:** Earlier versions could make the build area wrap at levels 4-5 above 150%, deleting builds;
-> 0.4.1 caps it. If blocks are missing, restore a backup from before the change.
-> Update the server and **every player** to 0.4.1 before loading the world.
+> **Data-loss warning:** Before 0.4.1, build areas at levels 4-5 above 150% lost saved building blocks; 0.4.1 capped
+> them at 240 m, and 0.4.2 at 239 m, which is safe wherever the altar stands. If blocks are missing, restore a backup
+> from before the change. Update the server and **every player** to 0.4.2 before loading the world.
 
 | Altar level | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
 | One side, the game | 40 m | 80 m | 120 m | 160 m | 160 m |
-| One side, `buildArea: 150` | 60 m | 120 m | 180 m | 240 m | 240 m |
-| One side, `buildArea: 200` (the most) | 80 m | 160 m | 240 m | 240 m | 240 m |
+| One side, `buildArea: 150` | 60 m | 120 m | 180 m | 239 m | 239 m |
+| One side, `buildArea: 200` (the most) | 80 m | 160 m | 239 m | 239 m | 239 m |
 
 - **When it applies:** at the next start of the server (or of your game, when you host). From then on every altar has
   the bigger area: new ones and the ones already placed (seen on the lab server with level-1 altars; every altar level
   reads the same table).
-- **Why 240 m per side:** 240 m is the largest value reported safe in the field. At levels 4-5, 159% (254.4 m)
-  already lost blocks after restarts; 160% (256 m) wrapped to 0 m, and 180% (288 m) wrapped to 32 m. The game stops
-  saving terrain and building blocks outside that smaller area. We do not use 252-255 m: they are not proven safe.
-  Levels 1-3 still reach 200% (80/160/240 m); levels 4-5 cap at 150% (240 m). Bigger areas also grow saves and reach
+- **Why 239 m per side:** the game saves a base's terrain and building blocks in 16 m chunks, and keeps at most
+  4,096 of them per base (16 × 16 × 16: a 256 m cube). Past that it skips chunks without a word, scattered across the
+  whole base, near the altar too, and they are gone after the next restart: about 17% of them at 254.4 m and 40% at
+  288 m. Nothing wraps to a smaller area; it only looks that way. At exactly 240 m, an altar whose side happens to sit
+  on the 16 m chunk grid can touch 17 chunks along that side and still lose some (seen on a lab server; 0.4.1's cap).
+  Any side under 240 m touches at most 16 chunks wherever the altar stands, so 0.4.2 caps each side at 239 m.
+  Levels 1-3 still reach 200% (80/160/239 m); levels 4-5 stop at 149% (239 m). Bigger areas also grow saves and reach
   neighbouring altars sooner; altars whose areas touch or overlap are one base in the game.
 - **Lowering it again** (or removing the mod) shrinks every area at the next start. What lies outside the smaller area
   is then no longer base terrain: the game stops saving it, and after the next save and restart the terrain there is
@@ -154,13 +157,14 @@ world's Flame level through `/altars` does change world progress and is saved by
 
 ## What is checked
 
-0.4.1 is checked offline (`tests/Offline`), without starting the game or a server: every altar level and axis at
-every integer percentage from 100 to 200 stays at or below 240 m, the preview agrees with the capped patch, the
-warning explains the data-loss risk, and existing 0.4.0 settings from 151 to 200 load with the cap automatically.
+0.4.2 is checked offline (`tests/Offline`), without starting the game or a server: every altar level and axis at
+every integer percentage from 100 to 200 stays at or below 239 m, the preview agrees with the capped patch, the
+warning explains the data-loss risk, and existing 0.4.0 settings from 150 to 200 load with the cap automatically.
+The 4,096-chunk save limit and the 240 m grid case were measured on a lab server (Kiln's RE report, 2026-11-23).
 The package is built with the pinned Kiln 0.2.0-dev.29.18 SDK. **No new in-game or lab check was run for 0.4.1.**
 
 **Historical 0.4.0 checks were insufficient:** only level-1 altars were placed. Reading larger values in the table
-did not prove that upgraded altars could save builds safely; player reports exposed the wrapping and data loss.
+did not prove that upgraded altars could save builds safely; player reports exposed the data loss.
 
 0.4.0, on a lab server (Kiln 0.2.0-dev.29.18 as released, server build 26430253, no player), by the lab test in
 `tests/LabTest` over eleven starts of one world with `buildArea` 100, 200, 100, 250 and 200 in that order (one 250
@@ -218,6 +222,9 @@ too (then capped at 32), and the `/altars` window.
 
 ## Changes
 
+- **0.4.2**: the cap is 239 m per side (was 240 m). The real limit is the game's save: at most 4,096 chunks of 16 m
+  per base, with the rest skipped silently and scattered across the base. At exactly 240 m an altar whose side sits on
+  the chunk grid could still lose some. Levels 4-5 now stop at 149%. Update every player and the server.
 - **0.4.1**: urgent data-loss fix. Every build-area side is capped at 240 m, including existing 151-200% settings.
   Levels 1-3 still scale to 200%; levels 4-5 stop at 150%. The window shows capped sizes and explains the cap, and
   `/altars` and the log warn about unsafe saved settings. Earlier versions could wrap the area and delete builds;

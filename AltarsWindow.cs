@@ -193,8 +193,8 @@ public sealed partial class MoreFlameAltarsMod
 
             ui.Separator("Build area");
             ui.Slider("Build area, percent of the game's", ref edit[SettingIndex.BuildArea], 100, BuildAreaCap);
-            ui.Tooltip("Every Flame Altar's build area, scaled on all three sides, then capped at 240 m. 100 keeps the game's sizes.");
-            ui.TextWrapped("Each side is capped at 240 m: levels 4-5 stop growing at 150%; levels 1-3 can scale up to 200%.");
+            ui.Tooltip("Every Flame Altar's build area, scaled on all three sides, then capped at 239 m. 100 keeps the game's sizes.");
+            ui.TextWrapped("Each side is capped at 239 m: levels 4-5 stop growing at 149%; levels 1-3 can scale up to 200%.");
             ui.TextDisabled($"One side: {BuildAreaAt(GameBuildArea[1], edit[SettingIndex.BuildArea]):0.#} m at altar level 1, " +
                             $"{BuildAreaAt(GameBuildArea[^1], edit[SettingIndex.BuildArea]):0.#} m at levels 4 and 5 " +
                             $"(the game's: {GameBuildArea[1]} and {GameBuildArea[^1]} m).");
