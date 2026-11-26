@@ -60,7 +60,7 @@ internal static unsafe class BaseMergeHook
     internal static Func<nuint, ulong?> ReadWord = a =>
     {
         try { return Memory.TryRead<ulong>(a, out var v) ? v : null; }
-        catch (KilnUnavailableException) { return null; }
+        catch (Exception) { return null; }  // kiln.hooks off, or no mod context: nothing to read
     };
 
     private sealed class Owned(nuint buffer, ulong capacity, VecKind kind)
@@ -75,7 +75,7 @@ internal static unsafe class BaseMergeHook
     private static readonly ConcurrentDictionary<nuint, byte> _zoneLists = new();  // base systems' zone lists seen
     private static readonly ConcurrentDictionary<nuint, byte> _merged = new();     // base systems merged into one base now
     private static volatile bool _enabled;
-    private static long _rebuilds, _merges, _skippedBases, _queryHits;
+    private static long _rebuilds, _merges, _skippedBases, _queryHits, _staleLists;
 
     /// <summary>The game's functions that get a detour (a managed handler that calls the original).</summary>
     internal static readonly string[] Detoured = ["BasesRebuild", "BasesAdd", "BasesRegion", "BasesPoint", "BasesWater"];
@@ -90,6 +90,8 @@ internal static unsafe class BaseMergeHook
     public static long Merges => Interlocked.Read(ref _merges);
     public static long SkippedBases => Interlocked.Read(ref _skippedBases);
     public static long QueryHits => Interlocked.Read(ref _queryHits);
+    /// <summary>Lists of ours found replaced by another list at the same address (see <see cref="Owns"/>).</summary>
+    public static long StaleLists => Interlocked.Read(ref _staleLists);
     public static int MergedNow => _merged.Count;
     /// <summary>The base system of the last rebuild (for the lab check, which rebuilds it from a made-up world).</summary>
     internal static nuint LastSystem;
@@ -168,7 +170,19 @@ internal static unsafe class BaseMergeHook
         _enabled = false;
         // Kiln calls OnUnload before it drains the handlers: a query may still read our storage, so none of it is freed
         // here (a few KB stay allocated until the process ends)
-        foreach (var (vec, o) in _owned) Shrink(vec, o, free: false);
+        // only lists that still hold our storage: a list destroyed without its resize to 0 left an entry whose address
+        // may hold another list now, or nothing. Guarded reads when Kiln's reader answers here (a probe of a local),
+        // else plain ones, as before 0.4.3: a list of ours left on our storage would be freed by the game without an allocator
+        ulong probe = 0x4B494C4E;
+        var guarded = ReadWord((nuint)(&probe)) == probe;
+        foreach (var (vec, o) in _owned)
+        {
+            var ours = guarded
+                ? ReadWord(vec + VecPtr) == (ulong)o.Buffer && ReadWord(vec + VecCapacity) == o.Capacity
+                : *(nuint*)(vec + VecPtr) == o.Buffer && *(ulong*)(vec + VecCapacity) == o.Capacity;
+            if (ours) Shrink(vec, o, free: false);
+            else Forget(vec, o);
+        }
         // a merged base keeps base 0 with a mask the 16 zones left can hold, and the game is asked to rebuild its bases
         foreach (var pb in _merged.Keys) *(uint*)(pb + Records + RecordMask) = 0xFFFF;
         foreach (var vec in _zoneLists.Keys) Interlocked.Decrement(ref *(int*)(vec - ZoneList + ZoneVersion));
@@ -194,7 +208,7 @@ internal static unsafe class BaseMergeHook
     {
         // capacity 0 on a base system's zone list: its destructor (server 0x207930 / 0x207ad0): forget the system
         if (capacity == 0 && _zoneLists.TryRemove(vec, out _)) _merged.TryRemove(vec - ZoneList, out _);
-        if (_owned.TryGetValue(vec, out var o))
+        if (Owns(vec, out var o))
         {
             if (capacity <= o.Kind.InlineCapacity) Shrink(vec, o, capacity);
             else if (capacity <= o.Capacity) *(ulong*)(vec + VecCount) = Math.Min(*(ulong*)(vec + VecCount), capacity);
@@ -226,6 +240,27 @@ internal static unsafe class BaseMergeHook
             }
         }
         return false;
+    }
+
+    /// <summary>Whether the list at <paramref name="vec"/> is one of ours: it still points at our storage with our
+    /// capacity (only the mod changes those of a list it owns, every resize of it comes here). An entry whose list is gone
+    /// (destroyed without the resize to 0 that hands our storage back, e.g. a copy the game frees itself) while another
+    /// list lives at that address now, on the stack or the heap, is dropped: acting on it would overwrite that list with
+    /// old contents, report room it does not have, or hand our storage to a list that frees it with the game's
+    /// allocator. Its storage is kept (a moved copy may still read it).</summary>
+    private static bool Owns(nuint vec, out Owned o)
+    {
+        if (!_owned.TryGetValue(vec, out o!)) return false;
+        if (*(nuint*)(vec + VecPtr) == o.Buffer && *(ulong*)(vec + VecCapacity) == o.Capacity) return true;
+        Forget(vec, o);
+        return false;
+    }
+
+    private static void Forget(nuint vec, Owned o)
+    {
+        if (!_owned.TryRemove(new KeyValuePair<nuint, Owned>(vec, o))) return;
+        Interlocked.Increment(ref _staleLists);
+        lock (Retired) Retired.Add(o.Buffer);
     }
 
     /// <summary>Moves the list into storage of ours with room for <paramref name="capacity"/>.</summary>
@@ -288,14 +323,14 @@ internal static unsafe class BaseMergeHook
         _zoneLists.TryAdd(vec, 0);
         if (!_enabled)
         {
-            if (_owned.TryGetValue(vec, out var mine)) Shrink(vec, mine);
+            if (Owns(vec, out var mine)) Shrink(vec, mine);
             _merged.TryRemove(pb, out _);
             return call.CallOriginal();
         }
         var zones = *(ulong*)(world + (nuint)WorldZones + 8);
         if (zones > BaseZones.InlineCapacity && zones <= MaxZones && *(ulong*)(vec + VecCapacity) < zones)
         {
-            if (_owned.TryGetValue(vec, out var o)) Regrow(vec, o, zones);
+            if (Owns(vec, out var o)) Regrow(vec, o, zones);
             else if ((*(ulong*)(vec + VecAllocator) & ~1UL) == 0) Take(vec, BaseZones, zones);
         }
         var result = call.CallOriginal();

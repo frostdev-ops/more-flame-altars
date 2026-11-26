@@ -432,4 +432,75 @@ finally
     }
 }
 
+// A list of ours that the game destroyed without the resize to 0 (a copy it frees itself, a stack list going out of
+// scope) leaves its address behind; the next list there, of the game, must get the game's own resize, and the mod's
+// unload must leave it alone too (0.4.3 review).
+{
+    var hook = modType.Assembly.GetType("MoreFlameAltars.BaseMergeHook")!;
+    var decide = hook.GetMethod("Decide", statics)!;
+    var zonesKind = hook.GetField("BaseZones", statics)!.GetValue(null)!;
+    var setEnabled = hook.GetMethod("SetEnabled", BindingFlags.Static | BindingFlags.Public)!;
+    var release = hook.GetMethod("Release", BindingFlags.Static | BindingFlags.Public)!;
+    var stale = hook.GetProperty("StaleLists", BindingFlags.Static | BindingFlags.Public)!;
+    var zoneLists = (ConcurrentDictionary<nuint, byte>)hook.GetField("_zoneLists", statics)!.GetValue(null)!;
+    const int size = 0x2070, zoneList = 0x1330;
+    void Put(nuint at, ulong v) => Marshal.WriteInt64((nint)at, (long)v);
+    ulong Get(nuint at) => (ulong)Marshal.ReadInt64((nint)at);
+    bool Decide(nuint vec, ulong capacity) => (bool)decide.Invoke(null, [vec, capacity, true, zonesKind])!;
+    // a base system's zone list (16 inline boxes at +0x30, no allocator) that the mod takes over
+    nuint System()
+    {
+        var pb = (nuint)Marshal.AllocHGlobal(size);
+        Marshal.Copy(new byte[size], 0, (nint)pb, size);
+        var vec = pb + zoneList;
+        Put(vec, (ulong)(vec + 0x30));
+        Put(vec + 8, 16);
+        Put(vec + 0x10, 16);
+        zoneLists[vec] = 0;
+        return pb;
+    }
+    // then the game reuses the address for another list: its own inline boxes (marked), 3 of 16, an allocator of its own
+    void Replace(nuint vec)
+    {
+        Put(vec, (ulong)(vec + 0x30));
+        Put(vec + 8, 3);
+        Put(vec + 0x10, 16);
+        Put(vec + 0x20, 0x5001);
+        Marshal.Copy(Enumerable.Repeat((byte)0xAB, 3 * 32).ToArray(), 0, (nint)(vec + 0x30), 3 * 32);
+    }
+    bool Untouched(nuint vec)
+    {
+        var boxes = new byte[3 * 32];
+        Marshal.Copy((nint)(vec + 0x30), boxes, 0, boxes.Length);
+        return Get(vec) == (ulong)(vec + 0x30) && Get(vec + 8) == 3 && Get(vec + 0x10) == 16 && boxes.All(b => b == 0xAB);
+    }
+    var a = System();
+    var b = System();
+    try
+    {
+        setEnabled.Invoke(null, [true]);
+        var va = a + zoneList;
+        var vb = b + zoneList;
+        Check(Decide(va, 20) && Get(va) != (ulong)(va + 0x30) && Get(va + 0x10) >= 20, "a base system's zone list past 16: the mod's storage");
+        var before = (long)stale.GetValue(null)!;
+        Replace(va);
+        Check(!Decide(va, 20) && Untouched(va),
+            "another list at the address of a list of ours: growing within our old room is the game's own resize (no room reported that it lacks)");
+        Check(!Decide(va, 8) && Untouched(va), "and shrinking it is the game's own too (our old contents are not copied over its boxes)");
+        Check((long)stale.GetValue(null)! == before + 1, "the stale entry is counted once and dropped");
+        Check(Decide(vb, 20), "a second system's zone list past 16: the mod's storage");
+        Replace(vb);
+        release.Invoke(null, []);
+        Check(Untouched(vb), "the mod's unload leaves a list that is no longer ours alone");
+    }
+    finally
+    {
+        setEnabled.Invoke(null, [false]);
+        zoneLists.TryRemove(a + zoneList, out _);
+        zoneLists.TryRemove(b + zoneList, out _);
+        Marshal.FreeHGlobal((nint)a);
+        Marshal.FreeHGlobal((nint)b);
+    }
+}
+
 Console.WriteLine($"{checks} offline regression checks passed.");
