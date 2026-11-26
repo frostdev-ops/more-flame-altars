@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Managed regression checks only: no game, native hooks or server is started.
+using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Kiln;
 using MoreFlameAltars;
 using ModSettings = MoreFlameAltars.Settings;
@@ -285,6 +287,74 @@ finally
     bool Differs(int[] a, int[] b, bool hooked) => (bool)differs.Invoke(null, [a, b, hooked])!;
     Check(Differs([16, 0, 0, 0, 0, 1, 100], [16, 0, 0, 0, 0, 1, 200], hooked: true), "a different build area matters with the hook in");
     Check(!Differs([16, 0, 0, 0, 0, 1, 100], [20, 0, 0, 0, 1, 1, 100], hooked: true), "with the hook in, altar settings follow the server");
+}
+
+// mergeBases' BasesContains hook (0.4.3, Wittie2m's report): the game's callers of BasesContains keep their loop index in
+// r11 and the point in xmm4/xmm5 across the call, so it is a mid hook at the function's first instruction, never a
+// detour, and it gives the game back every register except when it answers for a merged base itself.
+{
+    var hook = modType.Assembly.GetType("MoreFlameAltars.BaseMergeHook")!;
+    var detoured = (string[])hook.GetField("Detoured", statics)!.GetValue(null)!;
+    var atEntry = (string)hook.GetField("AtEntry", statics)!.GetValue(null)!;
+    Check(atEntry == "BasesContains" && !detoured.Contains(atEntry), "BasesContains gets a mid hook at its entry, not a detour");
+    Check(detoured.Order().SequenceEqual(new[] { "BasesAdd", "BasesPoint", "BasesRebuild", "BasesRegion", "BasesWater" }),
+        "the rebuild, the add and the other three queries stay detours (no caller of theirs keeps a register across the call)");
+    var entry = hook.GetMethod("ContainsEntry", statics)!;
+    Check(entry.GetParameters() is [{ ParameterType: { IsByRef: true } t }] && t.GetElementType() == typeof(Registers) && entry.ReturnType == typeof(void),
+        "ContainsEntry is a mid-hook handler (ref Registers)");
+    var merged = (ConcurrentDictionary<nuint, byte>)hook.GetField("_merged", statics)!.GetValue(null)!;
+    const int zones = 20, zoneList = 0x1330;
+    static float X(int i) => 100000 + i * 1000;
+    var pb = (nuint)Marshal.AllocHGlobal(0x2070);
+    var list = (nuint)Marshal.AllocHGlobal(zones * 32);
+    try
+    {
+        Marshal.Copy(new byte[0x2070], 0, (nint)pb, 0x2070);
+        for (var i = 0; i < zones; i++)
+        {
+            float[] box = [X(i), 0, 0, 0, X(i) + 50, 50, 50, 0];
+            Marshal.Copy(box, 0, (nint)(list + (nuint)(i * 32)), 8);
+        }
+        Marshal.WriteIntPtr((nint)(pb + zoneList), (nint)list);
+        Marshal.WriteInt64((nint)(pb + zoneList + 8), zones);
+        var inLast = Marshal.AllocHGlobal(12);
+        var between = Marshal.AllocHGlobal(12);
+        Marshal.Copy(new float[] { X(zones - 1) + 25, 25, 25 }, 0, inLast, 3);
+        Marshal.Copy(new float[] { X(zones - 1) + 500, 25, 25 }, 0, between, 3);
+        Registers Contains(ulong index, nint point)
+        {
+            var regs = new Registers { Rcx = pb, Rdx = (nuint)index, R8 = (nuint)point, Rax = 0x1234, R11 = 0x5, Rsp = 0x7000, TrampolineRsp = 0x6ff8, Rip = 0x4000 };
+            regs.Xmm(4).Fill(0x44);
+            regs.Xmm(5).Fill(0x55);
+            object?[] args = [regs];
+            entry.Invoke(null, args);
+            return (Registers)args[0]!;
+        }
+        bool Untouched(Registers r) => r.Rax == 0x1234 && r.TrampolineRsp == 0x6ff8 && r.Rip == 0x4000;
+        bool Kept(Registers r) => r.R11 == 0x5 && r.Xmm(4).ToArray().All(b => b == 0x44) && r.Xmm(5).ToArray().All(b => b == 0x55) &&
+                                  r.Rcx == pb && r.R8 != 0;
+        try
+        {
+            Check(Untouched(Contains(0, inLast)) && Kept(Contains(0, inLast)), "a base system that is not merged: the game's own function answers, registers as they were");
+            merged[pb] = 0;
+            var hit = Contains(0, inLast);
+            Check(hit.Rax == 1 && hit.TrampolineRsp == hit.Rsp && hit.Rip == 0x4000 && Kept(hit),
+                "merged: a point in the 20th zone is in base 0, answered at once, with r11, xmm4 and xmm5 as the caller left them");
+            Check(Untouched(Contains(1, inLast)) && Kept(Contains(1, inLast)), "merged: base 1 is the game's own answer");
+            Check(Untouched(Contains(0, between)) && Kept(Contains(0, between)), "merged: a point between zones is the game's own answer");
+        }
+        finally
+        {
+            merged.TryRemove(pb, out _);
+            Marshal.FreeHGlobal(inLast);
+            Marshal.FreeHGlobal(between);
+        }
+    }
+    finally
+    {
+        Marshal.FreeHGlobal((nint)list);
+        Marshal.FreeHGlobal((nint)pb);
+    }
 }
 
 Console.WriteLine($"{checks} offline regression checks passed.");

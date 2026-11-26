@@ -10,7 +10,10 @@
 //     overwrite the zone list);
 //   - after the rebuild, when there are more than 16 zones, all zones become ONE base: base 0 spans all of them;
 //   - the game's four "which base is this point in" queries answer base 0 for a point inside any altar's zone (the game's
-//     own answer first; the zone list is read only when the game says "no base");
+//     own answer first; the zone list is read only when the game says "no base"). Three of them are detours; the fourth,
+//     BasesContains, is a mid hook at its first instruction, because the game's callers of that one keep values in
+//     registers a detour's handler overwrites (ContainsEntry below; until 0.4.2 this cost every base but the first its
+//     Magic chests, with or without a merge);
 //   - on a client, the per-base UI lists of zones (room for 32 and 64, no allocator) get storage of our own too.
 // What it costs: with more than 16 zones there is one base, so the base list shows one base, every base chest is shared by
 // all altars, and the bases' comfort, beds and the rest are one base's. Nothing is checked in a real game yet.
@@ -56,6 +59,13 @@ internal static unsafe class BaseMergeHook
     private static volatile bool _enabled;
     private static long _rebuilds, _merges, _skippedBases, _queryHits;
 
+    /// <summary>The game's functions that get a detour (a managed handler that calls the original).</summary>
+    internal static readonly string[] Detoured = ["BasesRebuild", "BasesAdd", "BasesRegion", "BasesPoint", "BasesWater"];
+
+    /// <summary>The game's function that gets a mid hook at its first instruction instead (<see cref="ContainsEntry"/>):
+    /// its callers keep values in registers across the call that a detour's handler does not give back.</summary>
+    internal const string AtEntry = "BasesContains";
+
     public static bool Installed => _hooks.Count > 0;
     public static bool Enabled => _enabled;
     public static long Rebuilds => Interlocked.Read(ref _rebuilds);
@@ -88,7 +98,7 @@ internal static unsafe class BaseMergeHook
             if (!Hooks.Available) { why = "Kiln's hooks are not available on this game build"; return false; }
             GameSymbols.Load();
             var at = new Dictionary<string, nuint>();
-            foreach (var name in new[] { "BasesRebuild", "BasesAdd", "BasesContains", "BasesRegion", "BasesPoint", "BasesWater" })
+            foreach (var name in Detoured.Append(AtEntry))
             {
                 if (!Symbols.TryGet("more-flame-altars/" + name, out var a)) { why = $"the game's {name} function was not found on this game build"; return false; }
                 at[name] = a;
@@ -99,7 +109,7 @@ internal static unsafe class BaseMergeHook
             var targets = new List<(nuint At, DetourHandler Handler)>
             {
                 (ResizeBehind((nuint)Symbols.Hole(ctor, Symbols.Find(ctor), "grow")), c => Resize(c, BaseZones)),
-                (at["BasesRebuild"], Rebuild), (at["BasesAdd"], AddBase), (at["BasesContains"], Contains),
+                (at["BasesRebuild"], Rebuild), (at["BasesAdd"], AddBase),
                 (at["BasesRegion"], Region), (at["BasesPoint"], Point), (at["BasesWater"], Water),
             };
             if (Mods.Side == ModSide.Client)
@@ -112,6 +122,7 @@ internal static unsafe class BaseMergeHook
                 targets.Add((ResizeBehind((nuint)Symbols.Hole(ui, match, "index")), c => Resize(c, UiZoneIndex)));
             }
             foreach (var (target, handler) in targets) _hooks.Add(Hooks.Detour(target, handler));
+            _hooks.Add(Hooks.Mid(at[AtEntry], ContainsEntry));
             return true;
         }
         catch (Exception e)
@@ -310,12 +321,21 @@ internal static unsafe class BaseMergeHook
         return false;
     }
 
-    // contains(baseSystem, baseIndex, point) -> bool
-    private static nuint Contains(HookCall call)
+    // contains(baseSystem rcx, baseIndex rdx, point r8) -> al, through a mid hook at its first instruction, not a detour.
+    // Its two callers in the game (both exes) are AddToBaseStock (server 0x209b20, client 0x471220), with which
+    // RebuildBaseStock files every Magic chest and water source under its base every frame, and the per-base list of
+    // logic nodes (server 0x208940, client 0x470150). Both walk the bases and keep their loop index or entity id in r11
+    // and the point in xmm4/xmm5 across this call, because the game's compiler knows this function never writes them.
+    // A detour's managed handler does (Kiln's adapter alone sets r11 before it): from 0.3.0 to 0.4.2 every chest outside
+    // the first base was left out of its base's storage whenever the hooks were in, merged or not (Wittie2m's report).
+    // A mid hook gives every register back as it found it. On a merged base system base 0 holds every zone of the list,
+    // so a point in any of them answers true at once (the game's function looks at the first 16 zones only); every other
+    // call runs the game's function unchanged.
+    private static void ContainsEntry(ref Registers r)
     {
-        var result = call.CallOriginal();
-        if ((byte)result != 0 || call[1] != 0) return result;
-        return Find(call[0], call[2], out _) ? 1 : result;
+        if (r.Rdx != 0 || !Find(r.Rcx, r.R8, out _)) return;
+        r.Rax = 1;
+        r.TrampolineRsp = r.Rsp;  // back to the caller without running the function
     }
 
     // region(result, baseSystem, point) -> result; result: status u8 (0 = in a base, 0x1f = none), u32 at +4, base index u8 at +8
