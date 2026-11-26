@@ -5,7 +5,7 @@
 More Flame Altars (bases) for your world, from the first Flame level on. Optionally more water sources, and bigger
 build areas around every altar.
 
-> **Which version?** This README describes 0.4.1, which needs Kiln 0.2.0-dev.29.18 or later. On Kiln 0.2.0-dev.28 to
+> **Which version?** This README describes 0.4.3, which needs Kiln 0.2.0-dev.29.18 or later. On Kiln 0.2.0-dev.28 to
 > 0.2.0-dev.29.17, use **0.3.0** from [Releases](https://github.com/frostdev-ops/more-flame-altars/releases) (no build
 > area setting). Still on Kiln 0.2.0-dev.27? Use **0.1.0**: 16 Flame Altars at every Flame level (see
 > [0.1.0, for Kiln 0.2.0-dev.27](#010-for-kiln-020-dev27)).
@@ -111,6 +111,10 @@ list) keeps 16 zones and 16 bases. With `beyondSixteen` on, the mod lifts the fi
   crafting from base chests, survivor beds, animals and the rest work at all of them. The price: the journal lists one
   base, every base chest is shared by all altars, and comfort, beds and the rest are one base's. With 16 zones or fewer
   the game's own separate bases stay. The technique is XHL's (see Credits); the code is the mod's own.
+  **Fixed in 0.4.3:** from 0.3.0 to 0.4.2, with `beyondSixteen` and `mergeBases` on, the Magic chests (and wells) of
+  every base but the first were not base storage, with any number of altars: the sorter found no receiving chests and
+  stations could not take from them. One of the mod's hooks on the game's base checks changed values the game keeps
+  in registers around that check; 0.4.3 hooks it so that it leaves them alone.
 - **`mergeBases` off:** the game's 16 bases stay. Altars 17 and up let you build, but they are not bases: no comfort, no
   crafting from base chests, no survivor beds, no animals, no journal entry; which altars those are follows the order
   the game lists them in, which can change after a reload.
@@ -156,6 +160,27 @@ rewrite the game's files or your save: remove the mod and the next start has the
 world's Flame level through `/altars` does change world progress and is saved by the game.
 
 ## What is checked
+
+0.4.3, on lab servers (server build 26430253, no player) with Wittie2m's settings (`altars` 16, `extraAltars` 16,
+`beyondSixteen` and `mergeBases` on, `buildArea` 146), by `tests/LabTest/MagicChestTests.cs`, on Kiln
+0.2.0-dev.31.12 (the reporter's) over five starts of one world, and on Kiln 0.2.0-dev.29.18:
+
+- the game's own function that files a crafting-stock container under its base (AddToBaseStock), called on a made-up
+  base system of four bases: with 0.4.2 only base 0 got its entry and bases 1 to 3 answered "in no base"; with 0.4.3
+  every base gets its own;
+- altars placed 200 m apart, each with a Magic chest and a charcoal kiln: with 0.4.2, 1 of 3 chests was in its base's
+  storage (the first base's); the other two were not in it, took no deposits, and the game's fill from the base's chests
+  moved nothing into the kiln beside them (the player's report, reproduced). With 0.4.3, 3 of 3 on Kiln 0.2.0-dev.29.18;
+  on 0.2.0-dev.31.12, 6 of 6 (the 3 from the 0.4.2 start, after a restart, and 3 new), 18 of 18 with 18 altars (one
+  merged base of 18 zones), 18 of 18 again after a restart, and with `mergeBases` off the 16 chests in the game's 16
+  bases (the 2 others are in no base, as the game has it). "Takes deposits" is the filter the game's area deposit reads;
+  the sorter itself needs a player and was not run;
+- the 0.3.0 merge check (40 made-up zones as one base) passes with the new hook.
+
+Offline (`tests/Offline`): BasesContains is hooked at its first instruction, not detoured, and the handler leaves the
+registers the game keeps across the call alone, answering only for a merged base. Statically, on both exes: of the
+functions the mod hooks, only BasesContains has callers that keep values in registers across the call (r11, xmm4,
+xmm5); both callers are the same code on the server and the client.
 
 0.4.2 is checked offline (`tests/Offline`), without starting the game or a server: every altar level and axis at
 every integer percentage from 100 to 200 stays at or below 239 m, the preview agrees with the capped patch, the
@@ -210,6 +235,9 @@ too (then capped at 32), and the `/altars` window.
 
 **Not checked yet:**
 
+- the 0.4.3 fix in a player's game: the sorter ("no receiving chests in range") and stations taking from Magic chests in
+  a second or later base, on a world hosted from the game and when joined to a dedicated server (the client exe runs the
+  same code, read statically; nothing of it was run);
 - anything of `buildArea` in a player's game: whether the player's game draws the bigger border and lets them build
   in it, and what a game without the mod (or with another setting) does at the old border;
 - anything of 0.3.0 in a player's game: the client side of the merge (a player's base system and base UI lists), the
@@ -222,6 +250,12 @@ too (then capped at 32), and the `/altars` window.
 
 ## Changes
 
+- **0.4.3**: Magic chests are base storage again in every altar's area with `beyondSixteen` and `mergeBases` on.
+  Since 0.3.0 the mod's hook on one of the game's base checks broke the game's own sorting of chests into bases: in
+  every base but the first, Magic chests and wells were left out, so the sorter said "no receiving chests in range"
+  and stations could not take from them, with 16 altars or fewer as well as past 16. The hook now gives the game back
+  everything it keeps around that check. Chests already placed work again at the next start; nothing in the save
+  changes. Update the server and every player. Thanks to Wittie2m for the report.
 - **0.4.2**: the cap is 239 m per side (was 240 m). The real limit is the game's save: at most 4,096 chunks of 16 m
   per base, with the rest skipped silently and scattered across the base. At exactly 240 m an altar whose side sits on
   the chunk grid could still lose some. Levels 4-5 now stop at 149%. Update every player and the server.

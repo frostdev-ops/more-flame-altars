@@ -8,8 +8,8 @@
   <PropertyGroup>
     <KilnModId>more-flame-altars</KilnModId>
     <KilnModName>More Flame Altars</KilnModName>
-    <Version>0.4.2</Version>
-    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones. Bigger build areas around every altar, up to twice the game's size with each side capped at 240 m.</Description>
+    <Version>0.4.3</Version>
+    <Description>16 Flame Altars at every Flame level, where the game gives a new world 2 and reaches 16 only at Flame level 11. The number is a setting; up to 128 (experimental), optionally as one merged base past 16 zones. Bigger build areas around every altar, up to twice the game's size with each side capped at 239 m.</Description>
     <Authors>Frostdev</Authors>
     <AssemblyName>MoreFlameAltars</AssemblyName>
     <RootNamespace>MoreFlameAltars</RootNamespace>
@@ -29,6 +29,8 @@
     <!-- nothing to bake (no quests, skill nodes or VFX defined in code); the dev.28 bake host crashes on this machine
          (KILN032, TypeInitializationException in <Module>), and turning it off leaves the package the same -->
     <KilnBake>false</KilnBake>
+    <!-- release builds carry no build-machine paths: the DLL's PDB path and the PDB's source paths start at /_/ -->
+    <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
   <ItemGroup>
     <!-- lets the analyzers see KilnBoot on early dev.28 SDK builds, which left it out (KILN034); a duplicate is harmless -->
