@@ -7,7 +7,7 @@
     <KilnModName>More Flame Altars lab test</KilnModName>
     <Version>0.1.0</Version>
     <KilnSide>server</KilnSide>
-    <KilnServices>Assets;Quests;Testing;Hooks;Build;World</KilnServices>
+    <KilnServices>Assets;Quests;Testing;Hooks;Build;World;Blocks;Items</KilnServices>
     <KilnAdvanced>true</KilnAdvanced>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <KilnGameIds>None</KilnGameIds>
