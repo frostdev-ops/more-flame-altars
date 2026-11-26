@@ -12,9 +12,9 @@
 //   - the game's four "which base is this point in" queries answer base 0 for a point inside any altar's zone. Three
 //     are detours: the game's own answer first, the zone list read only when it says "no base". The fourth,
 //     BasesContains, is a mid hook at its first instruction, because the game's callers of that one keep values in
-//     registers a detour's handler overwrites (ContainsEntry below; until 0.4.2 this cost every base but the first its
-//     Magic chests, with or without a merge); for a merged base 0 it answers from the zone list, which holds every zone
-//     the game's own answer would look at;
+//     registers a detour's handler overwrites (ContainsEntry below; until 0.4.2, in a world of 2 to 16 bases, this cost
+//     every base but the game's base 0 its Magic chests); for a merged base 0 it answers from the zone list, which holds
+//     every zone the game's own answer would look at;
 //   - on a client, the per-base UI info's lists (room for 32 and 64, no allocator) get storage of our own too, and so
 //     do copies the game makes of them; no other list of the game that those two resize functions serve does.
 // What it costs: with more than 16 zones there is one base, so the base list shows one base, every base chest is shared by
@@ -403,11 +403,14 @@ internal static unsafe class BaseMergeHook
 
     // contains(baseSystem rcx, baseIndex rdx, point r8) -> al, through a mid hook at its first instruction, not a detour.
     // Its two callers in the game (both exes) are AddToBaseStock (server 0x209b20, client 0x471220), with which
-    // RebuildBaseStock files every Magic chest and water source under its base every frame, and the per-base list of
-    // logic nodes (server 0x208940, client 0x470150). Both walk the bases and keep their loop index or entity id in r11
-    // and the point in xmm4/xmm5 across this call, because the game's compiler knows this function never writes them.
-    // A detour's managed handler does (Kiln's adapter alone sets r11 before it): from 0.3.0 to 0.4.2 every chest outside
-    // the first base was left out of its base's storage whenever the hooks were in, merged or not (Wittie2m's report).
+    // RebuildBaseStock files every Magic chest and water source under its base every frame, and the per-base sets of
+    // one kind of entity (server 0x208940, client 0x470150, after every rebuild). Both walk the bases and keep their loop
+    // index or the entity id in r11 and the point in xmm4/xmm5 across this call, because the game's compiler knows this
+    // function never writes them. A detour's managed handler does (Kiln's adapter alone sets r11 before it): from 0.3.0
+    // to 0.4.2, whenever the hooks were in (beyondSixteen and mergeBases, any number of altars), a world of 2 to 16 bases
+    // had the Magic chests of the game's base 0 only in base storage, and base 0 is the game's numbering, not the first
+    // altar placed (Wittie2m's report, his main altar's). The sets got r11 instead of the id in every base. A merged
+    // world (one base) kept its chests.
     // A mid hook gives every register back as it found it. On a merged base system base 0 holds every zone of the list,
     // so a point in any of them answers true at once (the game's function looks at the first 16 zones only); every other
     // call runs the game's function unchanged.
