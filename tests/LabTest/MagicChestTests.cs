@@ -217,6 +217,7 @@ public sealed class MagicChestTests
     {
         Say("entity sets: settings: " + Settings());
         var hook = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("MoreFlameAltars.BaseMergeHook")).First(t => t is not null)!;
+        if (!(bool)hook.GetProperty("Installed")!.GetValue(null)!) Assert.Skip("mergeBases' hooks are not in this start (mergeBases off): BasesContains is the game's own");
         var system = (nuint)hook.GetField("LastSystem", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.GetValue(null)!;
         Assert.True(system != 0, "the mod saw the game rebuild its bases (its rebuild hook is in)");
         var count = *(uint*)(system + BaseCount);
