@@ -357,4 +357,79 @@ finally
     }
 }
 
+// mergeBases' takeover of the client's UI lists (0.4.3 review): the two resize functions serve many lists of the game; a
+// list past its inline room without an allocator gets the mod's storage only when it is a list of the per-base UI info,
+// or when the game asks without mayFail (a copy of one of ours: the game's own function would stop the game).
+{
+    var hook = modType.Assembly.GetType("MoreFlameAltars.BaseMergeHook")!;
+    var decide = hook.GetMethod("Decide", statics)!;
+    var zonesKind = hook.GetField("UiZones", statics)!.GetValue(null)!;
+    var indexKind = hook.GetField("UiZoneIndex", statics)!.GetValue(null)!;
+    var readWord = hook.GetField("ReadWord", statics)!;
+    var setEnabled = hook.GetMethod("SetEnabled", BindingFlags.Static | BindingFlags.Public)!;
+    var oldRead = readWord.GetValue(null);
+    const int obj = 0xbc8, headroom = 0x20000, uiSize = headroom + 0x28 + 32 * obj;
+    var ui = (nuint)Marshal.AllocHGlobal(uiSize);
+    var foreign = (nuint)Marshal.AllocHGlobal(0x200);
+    Marshal.Copy(new byte[uiSize], 0, (nint)ui, uiSize);
+    Marshal.Copy(new byte[0x200], 0, (nint)foreign, 0x200);
+    bool Mine(nuint a) => a >= ui && a + 8 <= ui + uiSize || a >= foreign && a + 8 <= foreign + 0x200;
+    readWord.SetValue(null, new Func<nuint, ulong?>(a => Mine(a) ? (ulong)Marshal.ReadInt64((nint)a) : null));
+    var header = ui + headroom;
+    var storage = header + 0x28;
+    void Put(nuint at, ulong v) => Marshal.WriteInt64((nint)at, (long)v);
+    ulong Get(nuint at) => (ulong)Marshal.ReadInt64((nint)at);
+    void List(nuint vec, ulong room, ulong allocator)
+    {
+        Put(vec, (ulong)(vec + 0x28));
+        Put(vec + 8, room);
+        Put(vec + 0x10, room);
+        Put(vec + 0x18, 0);
+        Put(vec + 0x20, allocator);
+    }
+    Put(header, (ulong)storage);
+    Put(header + 8, 2);   // two bases
+    Put(header + 0x10, 32);
+    for (var i = 0; i < 3; i++)
+    {
+        List(storage + (nuint)(i * obj) + 0x28, 32, 0);
+        List(storage + (nuint)(i * obj) + 0x958, 64, 0);
+        List(storage + (nuint)(i * obj) + 0xa88, 64, 0);
+    }
+    List(foreign, 64, 0);
+    bool Decide(nuint vec, ulong capacity, bool mayFail, object kind) => (bool)decide.Invoke(null, [vec, capacity, mayFail, kind])!;
+    bool Taken(nuint vec, ulong atLeast) => Get(vec) != (ulong)(vec + 0x28) && Get(vec + 0x10) >= atLeast;
+    var taken = new List<(nuint Vec, object Kind)>();
+    try
+    {
+        setEnabled.Invoke(null, [true]);
+        Check(!Decide(foreign, 128, true, indexKind) && Get(foreign) == (ulong)(foreign + 0x28) && Get(foreign + 0x10) == 64,
+            "a list of the game outside the per-base UI info, past its 64 with mayFail: the game's own answer (no takeover)");
+        var index1 = storage + (nuint)obj + 0x958;
+        Check(Decide(index1, 128, true, indexKind) && Taken(index1, 128), "base 1's first index list in the UI info: the mod's storage");
+        taken.Add((index1, indexKind));
+        var index1b = storage + (nuint)obj + 0xa88;
+        Check(Decide(index1b, 128, true, indexKind) && Taken(index1b, 128), "base 1's second index list in the UI info: the mod's storage");
+        taken.Add((index1b, indexKind));
+        var zones0 = storage + 0x28;
+        Check(Decide(zones0, 64, true, zonesKind) && Taken(zones0, 64), "base 0's zone records in the UI info: the mod's storage");
+        taken.Add((zones0, zonesKind));
+        var index2 = storage + (nuint)(2 * obj) + 0x958;
+        Check(!Decide(index2, 128, true, indexKind) && Get(index2) == (ulong)(index2 + 0x28),
+            "an object past the UI info's count is no list of the mod's");
+        Check(!Decide(storage + (nuint)obj + 0x28, 128, true, indexKind), "an index-list resize at the zone records' place is no list of the mod's");
+        Check(Decide(foreign, 128, false, indexKind) && Taken(foreign, 128),
+            "a list the game must grow and cannot (no mayFail: a copy of one of ours): the mod's storage instead of the game stopping");
+        taken.Add((foreign, indexKind));
+    }
+    finally
+    {
+        foreach (var (vec, kind) in taken) Decide(vec, 0, false, kind);  // the game's resize to 0: our storage goes back
+        setEnabled.Invoke(null, [false]);
+        readWord.SetValue(null, oldRead);
+        Marshal.FreeHGlobal((nint)foreign);
+        Marshal.FreeHGlobal((nint)ui);
+    }
+}
+
 Console.WriteLine($"{checks} offline regression checks passed.");

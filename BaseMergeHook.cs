@@ -15,7 +15,8 @@
 //     registers a detour's handler overwrites (ContainsEntry below; until 0.4.2 this cost every base but the first its
 //     Magic chests, with or without a merge); for a merged base 0 it answers from the zone list, which holds every zone
 //     the game's own answer would look at;
-//   - on a client, the per-base UI lists of zones (room for 32 and 64, no allocator) get storage of our own too.
+//   - on a client, the per-base UI info's lists (room for 32 and 64, no allocator) get storage of our own too, and so
+//     do copies the game makes of them; no other list of the game that those two resize functions serve does.
 // What it costs: with more than 16 zones there is one base, so the base list shows one base, every base chest is shared by
 // all altars, and the bases' comfort, beds and the rest are one base's. Nothing is checked in a real game yet.
 using System.Collections.Concurrent;
@@ -36,15 +37,31 @@ internal static unsafe class BaseMergeHook
     private const int ZoneVersion = 0x20;  // the world zone version the base system last rebuilt from (u32)
     private const ulong MaxZones = 4096;  // the world list holds at most 255; anything above is not a zone count
 
-    private sealed record VecKind(int ElementSize, int InlineOffset, ulong InlineCapacity, bool AnyWithoutAllocator);
+    /// <summary>A kind of list whose resize function the mod hooks. <paramref name="UiLists"/>: for the client's two
+    /// resize functions, where their lists sit in an object of the per-base UI info (empty for the zone list).</summary>
+    internal sealed record VecKind(int ElementSize, int InlineOffset, ulong InlineCapacity, int[] UiLists);
 
     /// <summary>Storage of ours has room for at least this many elements: the world holds at most 255 zones, so a list
     /// grows once and a reader that saw the old pointer never meets a count past its storage.</summary>
     private const ulong MinOwned = 256;
 
-    private static readonly VecKind BaseZones = new(ZoneSize, 0x30, 16, false);
-    private static readonly VecKind UiZones = new(0x48, 0x28, 32, true);      // client: a base's zone records
-    private static readonly VecKind UiZoneIndex = new(4, 0x28, 64, true);     // client: a base's zone indices
+    internal static readonly VecKind BaseZones = new(ZoneSize, 0x30, 16, []);
+    // The client's two resize functions (0x300e70 for 0x48-byte elements, 0x300ca0 for 4-byte ones, the inline room fixed
+    // in their code) serve many lists of the game besides the per-base UI info. The per-base UI info (client build
+    // 26430625): an array with room for 32 objects of 0xbc8 bytes, stored right behind its header (ptr, count, capacity
+    // 32, grow, allocator 0, storage at +0x28; set up by 0x836640, rebuilt by 0x31cf20), each object holding a base's
+    // zone records at +0x28 and its two index lists at +0x958 and +0xa88, none with an allocator.
+    internal static readonly VecKind UiZones = new(0x48, 0x28, 32, [0x28]);              // client: a base's zone records
+    internal static readonly VecKind UiZoneIndex = new(4, 0x28, 64, [0x958, 0xa88]);   // client: a base's zone indices
+    private const int UiObject = 0xbc8, UiSlots = 32, UiArrayStorage = 0x28;
+
+    /// <summary>A guarded read of 8 bytes (null where nothing can be read): the per-base UI info check reads around a
+    /// list the game hands the resize function. Kiln's Memory.TryRead in the game; the offline checks set their own.</summary>
+    internal static Func<nuint, ulong?> ReadWord = a =>
+    {
+        try { return Memory.TryRead<ulong>(a, out var v) ? v : null; }
+        catch (KilnUnavailableException) { return null; }
+    };
 
     private sealed class Owned(nuint buffer, ulong capacity, VecKind kind)
     {
@@ -164,10 +181,17 @@ internal static unsafe class BaseMergeHook
 
     // ---- the lists' resize function: resize(vector, capacity, mayFail) -> bool
 
-    private static nuint Resize(HookCall call, VecKind kind)
+    private static nuint Resize(HookCall call, VecKind kind) =>
+        Decide(call[0], (ulong)call[1], (byte)call[2] != 0, kind) ? 1 : call.CallOriginal();
+
+    /// <summary>The resize of <paramref name="vec"/> to <paramref name="capacity"/>: true when the mod did it (the game's
+    /// function then does not run), false for the game's own function. A list past its inline room without an allocator
+    /// gets storage of ours only when it is one of the lists the mod is for: a base system's zone list, a list of the
+    /// per-base UI info, or a list the game must grow and cannot (<paramref name="mayFail"/> false: the game's function
+    /// would stop the game, which only a copy of one of our lists asks for, e.g. client 0xb17fb0). Every other list the
+    /// game lets fail (mayFail) keeps the game's own answer: the game caps it at its inline room on purpose.</summary>
+    internal static bool Decide(nuint vec, ulong capacity, bool mayFail, VecKind kind)
     {
-        var vec = call[0];
-        var capacity = (ulong)call[1];
         // capacity 0 on a base system's zone list: its destructor (server 0x207930 / 0x207ad0): forget the system
         if (capacity == 0 && _zoneLists.TryRemove(vec, out _)) _merged.TryRemove(vec - ZoneList, out _);
         if (_owned.TryGetValue(vec, out var o))
@@ -175,13 +199,33 @@ internal static unsafe class BaseMergeHook
             if (capacity <= o.Kind.InlineCapacity) Shrink(vec, o, capacity);
             else if (capacity <= o.Capacity) *(ulong*)(vec + VecCount) = Math.Min(*(ulong*)(vec + VecCount), capacity);
             else Regrow(vec, o, capacity);
-            return 1;
+            return true;
         }
-        if (!_enabled || capacity <= kind.InlineCapacity || capacity > MaxZones * 4) return call.CallOriginal();
-        if (!kind.AnyWithoutAllocator && !_zoneLists.ContainsKey(vec)) return call.CallOriginal();
-        if ((*(ulong*)(vec + VecAllocator) & ~1UL) != 0) return call.CallOriginal();  // the game has an allocator for it
+        if (!_enabled || capacity <= kind.InlineCapacity || capacity > MaxZones * 4) return false;
+        if ((*(ulong*)(vec + VecAllocator) & ~1UL) != 0) return false;  // the game has an allocator for it
+        var ours = kind.UiLists.Length == 0 ? _zoneLists.ContainsKey(vec) : !mayFail || InUiInfo(vec, kind);
+        if (!ours) return false;
         Take(vec, kind, capacity);
-        return 1;
+        return true;
+    }
+
+    /// <summary>Whether <paramref name="vec"/> is one of <paramref name="kind"/>'s lists in an object of the client's
+    /// per-base UI info: some object i (below the array's count) of an array whose header points at its own storage
+    /// (+0x28) and has room for 32 holds the list at one of the kind's offsets. Reads are guarded (the candidates lie
+    /// up to 100 KB below the list).</summary>
+    internal static bool InUiInfo(nuint vec, VecKind kind)
+    {
+        foreach (var at in kind.UiLists)
+        {
+            for (var i = 0; i < UiSlots; i++)
+            {
+                var storage = vec - (nuint)at - (nuint)(i * UiObject);
+                var header = storage - UiArrayStorage;
+                if (ReadWord(header + VecPtr) != (ulong)storage || ReadWord(header + VecCapacity) != (ulong)UiSlots) continue;
+                if (ReadWord(header + VecCount) is { } count && (ulong)i < count) return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>Moves the list into storage of ours with room for <paramref name="capacity"/>.</summary>
