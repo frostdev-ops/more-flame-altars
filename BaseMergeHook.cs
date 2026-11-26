@@ -9,11 +9,12 @@
 //   - the game's rebuild fills it, and adding a 17th base record is skipped (the game does not check, and record 16 would
 //     overwrite the zone list);
 //   - after the rebuild, when there are more than 16 zones, all zones become ONE base: base 0 spans all of them;
-//   - the game's four "which base is this point in" queries answer base 0 for a point inside any altar's zone (the game's
-//     own answer first; the zone list is read only when the game says "no base"). Three of them are detours; the fourth,
+//   - the game's four "which base is this point in" queries answer base 0 for a point inside any altar's zone. Three
+//     are detours: the game's own answer first, the zone list read only when it says "no base". The fourth,
 //     BasesContains, is a mid hook at its first instruction, because the game's callers of that one keep values in
 //     registers a detour's handler overwrites (ContainsEntry below; until 0.4.2 this cost every base but the first its
-//     Magic chests, with or without a merge);
+//     Magic chests, with or without a merge); for a merged base 0 it answers from the zone list, which holds every zone
+//     the game's own answer would look at;
 //   - on a client, the per-base UI lists of zones (room for 32 and 64, no allocator) get storage of our own too.
 // What it costs: with more than 16 zones there is one base, so the base list shows one base, every base chest is shared by
 // all altars, and the bases' comfort, beds and the rest are one base's. Nothing is checked in a real game yet.
